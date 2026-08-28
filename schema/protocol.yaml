@@ -1,0 +1,237 @@
+# rovi_sdk 通信协议 v0.2.0 中立 schema
+# 本文件为协议实现的唯一手写真源，codegen 据此生成 C++ 头 / C 头 / .md / .msg。
+# v0.2.0 为硬切协议：ver=0x02，旧 v0.1.0 作废，无向后兼容。
+
+version: 0x02
+
+# 帧级元信息（所有帧共享）
+frame:
+  stx: 0xAA55           # 帧头 2 字节，小端呈现为 0xAA 0x55
+  version: 0x02         # 协议版本 1 字节，v0.2.0 固定为 0x02
+  len_includes: payload only  # len = payload 字节数，不含帧头、不含 CRC
+  endian: little        # 字节序固定小端（与 STM32 一致）
+  float: float32        # 浮点一律 IEEE-754 float32，位模式传输
+  crc:
+    poly: 0xA001        # CRC-16/MODBUS 多项式（反射形式）
+    init: 0xFFFF        # 初始值
+    coverage: from version byte, length 3 + len bytes  # 覆盖范围 = ver 起 3+len 字节，不含 STX
+    known_answer: 0x4B37 # 标准校验向量 crc16("123456789") == 0x4B37
+
+# 类型别名（codegen 映射用）
+types:
+  u8: uint8
+  f32: float32
+
+# 枚举定义
+enums:
+  Mode:
+    type: u8
+    values:
+      MANUAL: 0   # 手动遥控
+      AUTO: 1     # 自动控制
+      RETURN: 2   # 一键返航
+      HOLD: 3     # 悬停保持
+
+# 帧定义
+frames:
+  CmdPacket:
+    type: 0x01
+    direction: down  # 主控 -> 从控
+    notes: 控制指令帧，payload 52 字节
+    fields:
+      - name: mode
+        type: u8
+        unit: ""
+        range: {0: MANUAL, 1: AUTO, 2: RETURN, 3: HOLD}
+        notes: 运行模式
+      - name: armed
+        type: u8
+        unit: ""
+        range: [0, 1]
+        notes: 解锁标志，1=armed 输出推进器，0=停机
+      - name: reserved
+        type: u8
+        unit: ""
+        range: [0, 0]
+        notes: 保留，发送方清零，接收方忽略
+        count: 2
+      - name: surge
+        type: f32
+        unit: ""
+        range: [-1.0, 1.0]
+        notes: 前(+) / 后(-)
+      - name: sway
+        type: f32
+        unit: ""
+        range: [-1.0, 1.0]
+        notes: 右平移(+) / 左平移(-)
+      - name: heave
+        type: f32
+        unit: ""
+        range: [-1.0, 1.0]
+        notes: 上浮(+) / 下潜(-)
+      - name: yaw
+        type: f32
+        unit: ""
+        range: [-1.0, 1.0]
+        notes: 右转(+) / 左转(-)
+      - name: target_depth
+        type: f32
+        unit: m
+        range: [0.0, 300.0]
+        notes: 目标深度
+      - name: target_heading
+        type: f32
+        unit: deg
+        range: [0.0, 360.0]
+        notes: 目标航向
+      - name: target_north
+        type: f32
+        unit: m
+        range: [-10000.0, 10000.0]
+        notes: v2, firmware v1 ignores（目标北向位移，寻迹/返航用）
+      - name: target_east
+        type: f32
+        unit: m
+        range: [-10000.0, 10000.0]
+        notes: v2, firmware v1 ignores（目标东向位移，寻迹/返航用）
+      - name: reserved
+        type: u8
+        unit: ""
+        range: [0, 0]
+        notes: 保留，发送方清零，接收方忽略
+        count: 16
+
+  TelemetryPacket:
+    type: 0x02
+    direction: up  # 从控 -> 主控
+    notes: 遥测帧，payload 128 字节
+    fields:
+      - name: roll
+        type: f32
+        unit: deg
+        range: [-180.0, 180.0]
+        notes: 横滚角
+      - name: pitch
+        type: f32
+        unit: deg
+        range: [-90.0, 90.0]
+        notes: 俯仰角
+      - name: heading
+        type: f32
+        unit: deg
+        range: [0.0, 360.0]
+        notes: 航向角
+      - name: yaw_rate
+        type: f32
+        unit: deg/s
+        range: [-180.0, 180.0]
+        notes: 偏航角速度
+      - name: depth
+        type: f32
+        unit: m
+        range: [0.0, 300.0]
+        notes: 水深
+      - name: altitude
+        type: f32
+        unit: m
+        range: [0.0, 100.0]
+        notes: 距底高度
+      - name: north
+        type: f32
+        unit: m
+        range: [-10000.0, 10000.0]
+        notes: 相对原点北向位移
+      - name: east
+        type: f32
+        unit: m
+        range: [-10000.0, 10000.0]
+        notes: 相对原点东向位移
+      - name: vn
+        type: f32
+        unit: m/s
+        range: [-10.0, 10.0]
+        notes: 北向速度
+      - name: ve
+        type: f32
+        unit: m/s
+        range: [-10.0, 10.0]
+        notes: 东向速度
+      - name: vd
+        type: f32
+        unit: m/s
+        range: [-10.0, 10.0]
+        notes: 下潜速度（向下为正）
+      - name: voltage
+        type: f32
+        unit: V
+        range: [0.0, 60.0]
+        notes: 电池电压
+      - name: current
+        type: f32
+        unit: A
+        range: [0.0, 100.0]
+        notes: 电池电流
+      - name: percent
+        type: f32
+        unit: "%"
+        range: [0.0, 100.0]
+        notes: 电池电量百分比
+      - name: temperature
+        type: f32
+        unit: "°C"
+        range: [-10.0, 60.0]
+        notes: 电池/舱内温度
+      - name: water_temp
+        type: f32
+        unit: "°C"
+        range: [-5.0, 45.0]
+        notes: 水温
+      - name: salinity
+        type: f32
+        unit: PSU
+        range: [0.0, 45.0]
+        notes: 盐度
+      - name: pressure_bar
+        type: f32
+        unit: bar
+        range: [0.0, 40.0]
+        notes: 水压
+      - name: cable_tension
+        type: f32
+        unit: N
+        range: [0.0, 1000.0]
+        notes: 缆绳张力
+      - name: thr
+        type: f32
+        unit: "%"
+        range: [-1.0, 1.0]
+        notes: 8 路推进器输出百分比
+        count: 8
+      - name: leak
+        type: u8
+        unit: ""
+        range: [0, 1]
+        notes: 漏水检测，1=报警
+      - name: armed
+        type: u8
+        unit: ""
+        range: [0, 1]
+        notes: 当前 armed 状态
+      - name: mode
+        type: u8
+        unit: ""
+        range: {0: MANUAL, 1: AUTO, 2: RETURN, 3: HOLD}
+        notes: 当前运行模式
+      - name: reserved
+        type: u8
+        unit: ""
+        range: [0, 0]
+        notes: 保留，发送方清零，接收方忽略
+        count: 1
+      - name: reserved
+        type: u8
+        unit: ""
+        range: [0, 0]
+        notes: 保留，发送方清零，接收方忽略
+        count: 16
