@@ -95,11 +95,11 @@ frames:
         unit: m
         range: [-10000.0, 10000.0]
         notes: v2, firmware v1 ignores（目标东向位移，寻迹/返航用）
-      - name: reserved
+      - name: reserved_tail
         type: u8
         unit: ""
         range: [0, 0]
-        notes: 保留，发送方清零，接收方忽略
+        notes: 扩展预留区（云台/机械臂/照明等后置），发送方清零，接收方忽略
         count: 16
 
   TelemetryPacket:
@@ -229,9 +229,9 @@ frames:
         range: [0, 0]
         notes: 保留，发送方清零，接收方忽略
         count: 1
-      - name: reserved
+      - name: reserved_tail
         type: u8
         unit: ""
         range: [0, 0]
-        notes: 保留，发送方清零，接收方忽略
+        notes: 扩展预留区（云台/机械臂/照明等后置），发送方清零，接收方忽略
         count: 16
