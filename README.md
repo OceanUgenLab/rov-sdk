@@ -54,20 +54,13 @@ int main() {
 
 ## 架构分层
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  link  组合层  (ou::link)                                │
-│  FrameLink / UdpFrameLink / SerialFrameLink              │
-│  send_frame · recv_frame · recv_frame_as<Pkt>（类型安全） │
-├─────────────────────────────────────────────────────────┤
-│  channel  字节搬运层  (ou::channel)                       │
-│  FrameChannel / UdpChannel / SerialChannel               │
-│  纯字节收发，不组帧、不解析 STX/CRC                       │
-├─────────────────────────────────────────────────────────┤
-│  proto  编解码层  (ou::proto)                            │
-│  crc16 · encodeCmd/Tele · decodeCmd/Tele · FrameParser   │
-│  有状态流式切帧（滑动窗口，容忍噪声/粘包）                  │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    L["link 组合层 (ou::link)<br/>FrameLink / UdpFrameLink / SerialFrameLink<br/>send_frame · recv_frame · recv_frame_as&lt;Pkt&gt;（类型安全）"]
+    C["channel 字节搬运层 (ou::channel)<br/>FrameChannel / UdpChannel / SerialChannel<br/>纯字节收发，不组帧、不解析 STX/CRC"]
+    P["proto 编解码层 (ou::proto)<br/>crc16 · encodeCmd/Tele · decodeCmd/Tele · FrameParser<br/>有状态流式切帧（滑动窗口，容忍噪声/粘包）"]
+
+    L --> C --> P
 ```
 
 | 层 | 库 | 别名 | 职责 |
@@ -84,8 +77,9 @@ int main() {
 
 **协议修改的唯一路径**（详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)）：
 
-```
-改 schema/protocol.yaml  →  tools/codegen.py  →  tools/golden_gen.py  →  三端派生同步
+```mermaid
+flowchart LR
+    A["改 schema/protocol.yaml"] --> B["tools/codegen.py"] --> C["tools/golden_gen.py"] --> D["三端派生同步"]
 ```
 
 `schema/protocol.yaml` 是唯一手写真源，`generated/` 下所有产物（C++ 头 / C 头 / 协议文档 / ROS2 `.msg` / golden 向量）均为派生结果，禁止手改。
@@ -101,23 +95,24 @@ target_link_libraries(app PRIVATE ou::link)
 
 ## 项目结构
 
-```
-rov-sdk/
-├── include/ou/            # 手写公共头（proto/channel/link）
-├── src/                   # 三库实现
-├── schema/protocol.yaml   # 协议唯一手写真源
-├── generated/             # codegen 派生产物（勿手改）
-│   ├── ou/protocol.hpp    # C++ 头
-│   ├── ou_protocol.h      # C 头
-│   ├── docs/protocol.md   # 协议文档
-│   ├── msg/               # ROS2 .msg
-│   └── golden/            # golden 字节向量
-├── tools/                 # codegen.py / golden_gen.py
-├── examples/              # 两个最小可编译示例
-├── docs/                  # Doxygen 配置 + 文档入口
-├── tests/                 # 独立测试可执行程序（ctest）
-├── .github/               # issue/PR 模板 + CI 工作流
-└── .devcontainer/         # VS Code 开发容器
+```mermaid
+flowchart TB
+    ROOT["rov-sdk/"]
+    ROOT --> INC["include/ou/ — 手写公共头（proto/channel/link）"]
+    ROOT --> SRC["src/ — 三库实现"]
+    ROOT --> SCHEMA["schema/protocol.yaml — 协议唯一手写真源"]
+    ROOT --> GEN["generated/ — codegen 派生产物（勿手改）"]
+    GEN --> G1["ou/protocol.hpp — C++ 头"]
+    GEN --> G2["ou_protocol.h — C 头"]
+    GEN --> G3["docs/protocol.md — 协议文档"]
+    GEN --> G4["msg/ — ROS2 .msg"]
+    GEN --> G5["golden/ — golden 字节向量"]
+    ROOT --> TOOLS["tools/ — codegen.py / golden_gen.py"]
+    ROOT --> EX["examples/ — 两个最小可编译示例"]
+    ROOT --> DOCS["docs/ — Doxygen 配置 + 文档入口"]
+    ROOT --> TESTS["tests/ — 独立测试可执行程序（ctest）"]
+    ROOT --> GH[".github/ — issue/PR 模板 + CI 工作流"]
+    ROOT --> DC[".devcontainer/ — VS Code 开发容器"]
 ```
 
 ## 文档
