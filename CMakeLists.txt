@@ -43,9 +43,21 @@ target_include_directories(ou_channel PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# 链路组合层: FrameChannel + FrameParser, 提供 send_frame / recv_frame / recv_frame_as<Pkt>
+add_library(ou_link
+    src/frame_link.cpp
+)
+add_library(ou::link ALIAS ou_link)
+
+target_include_directories(ou_link PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ou_link PUBLIC ou::proto ou::channel)
+
 # 安装规则: 供 ROVAPP 以 find_package(ou_sdk) 或 add_subdirectory 消费
 include(GNUInstallDirs)
-install(TARGETS ou_proto ou_channel
+install(TARGETS ou_proto ou_channel ou_link
     EXPORT ou_sdkTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
