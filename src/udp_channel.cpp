@@ -70,7 +70,7 @@ UdpChannel::UdpChannel() : impl_(new Impl{}) {}
 
 UdpChannel::~UdpChannel() {
     if (impl_) {
-        close(impl_->sock);
+        sock_close(impl_->sock);
         delete impl_;
         impl_ = nullptr;
     }
