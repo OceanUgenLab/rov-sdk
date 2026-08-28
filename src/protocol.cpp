@@ -1,10 +1,10 @@
-// rovi_sdk 通信协议实现 — 显式序列化, 固定小端, 无 strict-aliasing UB
-#include "rovi/protocol.hpp"
+// ou_sdk 通信协议实现 — 显式序列化, 固定小端, 无 strict-aliasing UB
+#include "ou/protocol.hpp"
 
 #include <bit>
 #include <cstring>
 
-namespace rovi {
+namespace ou {
 
 // ---------------------------------------------------------------------------
 // 小端字节读写工具 (协议固定小端, 与固件 STM32 一致)
@@ -189,4 +189,4 @@ bool parseCmdStream(std::span<const uint8_t> buf, CmdPacket& out) {
     return false;
 }
 
-}  // namespace rovi
+}  // namespace ou

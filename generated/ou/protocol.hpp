@@ -8,7 +8,7 @@
 #include <span>
 #include <vector>
 
-namespace rovi {
+namespace ou {
 
 // 帧常量（v0.2.0 固定格式：AA 55 | ver | len | type | payload | crc16）
 inline constexpr uint8_t kStx0 = 0xAA;                 // 帧头第一字节
@@ -115,4 +115,4 @@ std::vector<uint8_t> encodeTele(const TelemetryPacket& tele);
 std::optional<CmdPacket> decodeCmd(std::span<const uint8_t> frame);
 std::optional<TelemetryPacket> decodeTele(std::span<const uint8_t> frame);
 
-} // namespace rovi
+} // namespace ou

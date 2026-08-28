@@ -1,6 +1,6 @@
 <!-- AUTO-GENERATED, DO NOT EDIT, source: schema/protocol.yaml -->
 
-# ROVI 通信协议（v0.2.0）
+# OU 通信协议（v0.2.0）
 
 > 本文件由 `tools/codegen.py` 从 `schema/protocol.yaml` 自动生成。三端（上位机 SDK、算力板、STM32 固件）以 `schema/protocol.yaml` 为唯一权威源。
 

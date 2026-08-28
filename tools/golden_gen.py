@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rovi_sdk schema-driven golden vector generator.
+"""ou_sdk schema-driven golden vector generator.
 
 Reads schema/protocol.yaml and emits:
     generated/golden/golden.h   (C-compatible byte arrays)
@@ -155,14 +155,14 @@ def make_cases(schema: dict) -> list[dict]:
             schema,
             "CmdPacket",
             CMD_INPUTS,
-            "ROVI_GOLDEN_CMD_FRAME",
+            "OU_GOLDEN_CMD_FRAME",
             "固定控制指令 golden 帧，mode=AUTO, armed=1, 全部 reserved 清零",
         ),
         case_from_inputs(
             schema,
             "TelemetryPacket",
             TELE_INPUTS,
-            "ROVI_GOLDEN_TELE_FRAME",
+            "OU_GOLDEN_TELE_FRAME",
             "固定遥测 golden 帧，mode=AUTO, armed=1, 8 路 thr 互异，全部 reserved 清零",
         ),
     ]
@@ -176,17 +176,17 @@ def fmt_hex_byte(b: int) -> str:
 def render_h(cases: list[dict]) -> str:
     lines = []
     lines.append(f"/* {AUTO_HEADER} */")
-    lines.append("#ifndef ROVI_GOLDEN_H")
-    lines.append("#define ROVI_GOLDEN_H")
+    lines.append("#ifndef OU_GOLDEN_H")
+    lines.append("#define OU_GOLDEN_H")
     lines.append("")
     lines.append("#include <stdint.h>")
     lines.append("")
-    lines.append(f"#define ROVI_GOLDEN_CRC_KNOWN_ANSWER 0x4B37")
+    lines.append(f"#define OU_GOLDEN_CRC_KNOWN_ANSWER 0x4B37")
     lines.append("")
     lines.append("/* CRC standard test vector: crc16(\"123456789\") = 0x4B37 */")
     crc_data = list("123456789".encode("ascii"))
     crc_data_str = ", ".join(fmt_hex_byte(b) for b in crc_data)
-    lines.append(f"static const uint8_t ROVI_GOLDEN_CRC_DATA_123456789[] = {{{crc_data_str}}};")
+    lines.append(f"static const uint8_t OU_GOLDEN_CRC_DATA_123456789[] = {{{crc_data_str}}};")
     lines.append("")
     for case in cases:
         name = case["name"]
@@ -197,7 +197,7 @@ def render_h(cases: list[dict]) -> str:
         bytes_str = ", ".join(fmt_hex_byte(b) for b in case["expected_frame"])
         lines.append(f"static const uint8_t {arr}[{arr}_LEN] = {{{bytes_str}}};")
         lines.append("")
-    lines.append("#endif /* ROVI_GOLDEN_H */")
+    lines.append("#endif /* OU_GOLDEN_H */")
     return "\n".join(lines) + "\n"
 
 

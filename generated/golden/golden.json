@@ -7,7 +7,7 @@
   "cases": [
     {
       "name": "CmdPacket",
-      "array_name": "ROVI_GOLDEN_CMD_FRAME",
+      "array_name": "OU_GOLDEN_CMD_FRAME",
       "frame_type": 1,
       "payload_size": 52,
       "total_length": 59,
@@ -110,7 +110,7 @@
     },
     {
       "name": "TelemetryPacket",
-      "array_name": "ROVI_GOLDEN_TELE_FRAME",
+      "array_name": "OU_GOLDEN_TELE_FRAME",
       "frame_type": 2,
       "payload_size": 128,
       "total_length": 135,
