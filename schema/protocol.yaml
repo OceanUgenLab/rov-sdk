@@ -1,4 +1,4 @@
-# rovi_sdk 通信协议 v0.2.0 中立 schema
+# ou_sdk 通信协议 v0.2.0 中立 schema
 # 本文件为协议实现的唯一手写真源，codegen 据此生成 C++ 头 / C 头 / .md / .msg。
 # v0.2.0 为硬切协议：ver=0x02，旧 v0.1.0 作废，无向后兼容。
 

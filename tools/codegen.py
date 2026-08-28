@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""rovi_sdk schema-driven code generator.
+"""ou_sdk schema-driven code generator.
 
 Reads schema/protocol.yaml and emits:
-    generated/rovi/protocol.hpp   (C++20 header)
-    generated/rovi_protocol.h     (C11 packed header)
+    generated/ou/protocol.hpp   (C++20 header)
+    generated/ou_protocol.h     (C11 packed header)
     generated/docs/protocol.md    (Chinese protocol documentation)
     generated/msg/Cmd.msg         (ROS2 message definition)
     generated/msg/Telemetry.msg   (ROS2 message definition)
@@ -194,7 +194,7 @@ CPP_TEMPLATE = r"""// {{ ctx.auto_header }}
 #include <span>
 #include <vector>
 
-namespace rovi {
+namespace ou {
 
 // 帧常量（v0.2.0 固定格式：AA 55 | ver | len | type | payload | crc16）
 inline constexpr uint8_t kStx0 = {{ "0x%02X" % ctx.stx0 }};                 // 帧头第一字节
@@ -247,12 +247,12 @@ std::vector<uint8_t> encodeTele(const TelemetryPacket& tele);
 std::optional<CmdPacket> decodeCmd(std::span<const uint8_t> frame);
 std::optional<TelemetryPacket> decodeTele(std::span<const uint8_t> frame);
 
-} // namespace rovi
+} // namespace ou
 """
 
 C_TEMPLATE = r"""/* {{ ctx.auto_header }} */
-#ifndef ROVI_GENERATED_PROTOCOL_H
-#define ROVI_GENERATED_PROTOCOL_H
+#ifndef OU_GENERATED_PROTOCOL_H
+#define OU_GENERATED_PROTOCOL_H
 
 #include <stdint.h>
 
@@ -261,22 +261,22 @@ extern "C" {
 #endif
 
 /* 帧常量 */
-#define ROVI_STX0 {{ "0x%02X" % ctx.stx0 }}
-#define ROVI_STX1 {{ "0x%02X" % ctx.stx1 }}
-#define ROVI_PROTOCOL_VERSION {{ "0x%02X" % ctx.version }}
-#define ROVI_TYPE_CMD {{ "0x%02X" % ctx.type_cmd }}
-#define ROVI_TYPE_TELE {{ "0x%02X" % ctx.type_tele }}
-#define ROVI_NUM_THRUSTERS {{ ctx.num_thrusters }}
-#define ROVI_FRAME_OVERHEAD {{ ctx.frame_overhead }}
-#define ROVI_CMD_PAYLOAD_SIZE {{ ctx.cmd_size }}
-#define ROVI_TELE_PAYLOAD_SIZE {{ ctx.tele_size }}
+#define OU_STX0 {{ "0x%02X" % ctx.stx0 }}
+#define OU_STX1 {{ "0x%02X" % ctx.stx1 }}
+#define OU_PROTOCOL_VERSION {{ "0x%02X" % ctx.version }}
+#define OU_TYPE_CMD {{ "0x%02X" % ctx.type_cmd }}
+#define OU_TYPE_TELE {{ "0x%02X" % ctx.type_tele }}
+#define OU_NUM_THRUSTERS {{ ctx.num_thrusters }}
+#define OU_FRAME_OVERHEAD {{ ctx.frame_overhead }}
+#define OU_CMD_PAYLOAD_SIZE {{ ctx.cmd_size }}
+#define OU_TELE_PAYLOAD_SIZE {{ ctx.tele_size }}
 
 /* 字段偏移宏 */
 {% for f in ctx.cmd_fields %}
-#define ROVI_CMDPACKET_{{ f.name.upper() }}_OFFSET {{ f.offset }}
+#define OU_CMDPACKET_{{ f.name.upper() }}_OFFSET {{ f.offset }}
 {% endfor %}
 {% for f in ctx.tele_fields %}
-#define ROVI_TELEMETRYPACKET_{{ f.name.upper() }}_OFFSET {{ f.offset }}
+#define OU_TELEMETRYPACKET_{{ f.name.upper() }}_OFFSET {{ f.offset }}
 {% endfor %}
 
 /* 控制指令载荷（主控 -> 从控） */
@@ -308,12 +308,12 @@ _Static_assert(sizeof(TelemetryPacket) == {{ ctx.tele_size }}, "TelemetryPacket 
 }
 #endif
 
-#endif /* ROVI_GENERATED_PROTOCOL_H */
+#endif /* OU_GENERATED_PROTOCOL_H */
 """
 
 MD_TEMPLATE = r"""<!-- {{ ctx.auto_header }} -->
 
-# ROVI 通信协议（v0.2.0）
+# OU 通信协议（v0.2.0）
 
 > 本文件由 `tools/codegen.py` 从 `schema/protocol.yaml` 自动生成。三端（上位机 SDK、算力板、STM32 固件）以 `schema/protocol.yaml` 为唯一权威源。
 
@@ -403,7 +403,7 @@ def write_if_changed(path: Path, content: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate rovi protocol artifacts from schema.")
+    parser = argparse.ArgumentParser(description="Generate ou protocol artifacts from schema.")
     parser.add_argument(
         "--schema",
         type=Path,
@@ -421,8 +421,8 @@ def main() -> int:
     schema = load_schema(args.schema)
     out = args.out_dir
 
-    write_if_changed(out / "rovi" / "protocol.hpp", render_cpp(schema))
-    write_if_changed(out / "rovi_protocol.h", render_c(schema))
+    write_if_changed(out / "ou" / "protocol.hpp", render_cpp(schema))
+    write_if_changed(out / "ou_protocol.h", render_c(schema))
     write_if_changed(out / "docs" / "protocol.md", render_md(schema))
     write_if_changed(out / "msg" / "Cmd.msg", render_msg(schema, "CmdPacket"))
     write_if_changed(out / "msg" / "Telemetry.msg", render_msg(schema, "TelemetryPacket"))

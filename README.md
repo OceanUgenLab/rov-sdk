@@ -1,4 +1,4 @@
-# rovi_sdk — 水下机器人上位机侧 SDK
+# ou_sdk — 水下机器人上位机侧 SDK
 
 C++20 实现的水下机器人上位机侧 SDK。当前包含**通信协议编解码**（二进制帧协议，三端共享契约），规划扩展数据模型与传输层。
 
@@ -17,8 +17,8 @@ cd build && ctest
 ## 集成
 
 ```cmake
-add_subdirectory(rovi_sdk)   # 或 find_package
-target_link_libraries(app PRIVATE rovi::proto)
+add_subdirectory(ou_sdk)   # 或 find_package
+target_link_libraries(app PRIVATE ou::proto)
 ```
 
 ## 许可

@@ -1,4 +1,4 @@
-// rovi_sdk 通信协议 — 固件二进制帧协议 (C++20 显式序列化实现)
+// ou_sdk 通信协议 — 固件二进制帧协议 (C++20 显式序列化实现)
 //
 // 帧格式: AA 55 | len(1B) | type(1B) | payload(len) | crc16(2B, 小端)
 //   - 无 ETX; len 在 type 之前, 1 字节;
@@ -16,7 +16,7 @@
 #include <span>
 #include <vector>
 
-namespace rovi {
+namespace ou {
 
 // 帧常量 (与固件 protocol.h / master_bridge.py 逐字节一致)
 inline constexpr uint8_t kStx0 = 0xAA;        // 帧头第一字节
@@ -80,4 +80,4 @@ bool parseCmdStream(std::span<const uint8_t> buf, CmdPacket& out);
 // 帧总长 = kFrameOverhead + payload_len
 constexpr size_t frameSize(size_t payload_len) { return kFrameOverhead + payload_len; }
 
-}  // namespace rovi
+}  // namespace ou

@@ -1,14 +1,14 @@
-// rovi_sdk 协议编解码测试 — golden 帧字节级验证
+// ou_sdk 协议编解码测试 — golden 帧字节级验证
 //
 // 关键: golden 帧由固件 protocol.c / master_bridge.py 的逐字节行为定义,
 // 本测试将编码结果与硬编码字节序列比对, 确保显式序列化实现与固件一致。
-#include "rovi/protocol.hpp"
+#include "ou/protocol.hpp"
 
 #include <cstdio>
 #include <vector>
 
-using rovi::CmdPacket;
-using rovi::TelemetryPacket;
+using ou::CmdPacket;
+using ou::TelemetryPacket;
 
 static int g_failures = 0;
 
@@ -41,7 +41,7 @@ static TelemetryPacket makeTele() {
     t.roll = -3.0f;
     t.pitch = 2.5f;
     t.battery = 25.2f;
-    for (size_t i = 0; i < rovi::kNumThrusters; ++i) {
+    for (size_t i = 0; i < ou::kNumThrusters; ++i) {
         t.thr[i] = 0.1f * static_cast<float>(i) - 0.4f;
     }
     return t;
@@ -53,14 +53,14 @@ static TelemetryPacket makeTele() {
 //             90.0f=0x42B40000, 50.0f=0x42480000
 static void testGoldenCmdEncode() {
     const CmdPacket c = makeCmd();
-    const std::vector<uint8_t> frame = rovi::encodeCmd(c);
-    CHECK(frame.size() == rovi::frameSize(rovi::kCmdPayloadSize));  // 6+26=32
+    const std::vector<uint8_t> frame = ou::encodeCmd(c);
+    CHECK(frame.size() == ou::frameSize(ou::kCmdPayloadSize));  // 6+26=32
 
     // 帧头 + len + type
     CHECK(frame[0] == 0xAA);
     CHECK(frame[1] == 0x55);
-    CHECK(frame[2] == rovi::kCmdPayloadSize);  // 26
-    CHECK(frame[3] == rovi::kTypeCmd);          // 0x01
+    CHECK(frame[2] == ou::kCmdPayloadSize);  // 26
+    CHECK(frame[3] == ou::kTypeCmd);          // 0x01
 
     // 字段 0: surge = 0.5f -> 3F000000 小端 -> 00 00 00 3F
     CHECK(frame[4] == 0x00 && frame[5] == 0x00 && frame[6] == 0x00 && frame[7] == 0x3F);
@@ -80,7 +80,7 @@ static void testGoldenCmdEncode() {
     // CRC16 覆盖 len..payload (不含 STX): 手工计算确认
     // 已知参考值由固件 proto_crc16 对 28 字节 (len+type+payload) 计算
     // 这里用实现自洽验证: 解码必须接受该帧
-    const auto dec = rovi::decodeCmd(frame);
+    const auto dec = ou::decodeCmd(frame);
     CHECK(dec.has_value());
     if (dec) {
         CHECK(dec->surge == c.surge);
@@ -96,16 +96,16 @@ static void testGoldenCmdEncode() {
 // 遥测 golden: 字段与帧结构验证
 static void testGoldenTeleEncode() {
     const TelemetryPacket t = makeTele();
-    const std::vector<uint8_t> frame = rovi::encodeTele(t);
-    CHECK(frame.size() == rovi::frameSize(rovi::kTelePayloadSize));  // 6+52=58
+    const std::vector<uint8_t> frame = ou::encodeTele(t);
+    CHECK(frame.size() == ou::frameSize(ou::kTelePayloadSize));  // 6+52=58
     CHECK(frame[0] == 0xAA && frame[1] == 0x55);
-    CHECK(frame[2] == rovi::kTelePayloadSize);
-    CHECK(frame[3] == rovi::kTypeTele);
+    CHECK(frame[2] == ou::kTelePayloadSize);
+    CHECK(frame[3] == ou::kTypeTele);
 
     // depth = 12.5f -> 41480000 小端 -> 00 00 48 41
     CHECK(frame[4] == 0x00 && frame[5] == 0x00 && frame[6] == 0x48 && frame[7] == 0x41);
 
-    const auto dec = rovi::decodeTele(frame);
+    const auto dec = ou::decodeTele(frame);
     CHECK(dec.has_value());
     if (dec) {
         CHECK(dec->depth == t.depth);
@@ -119,11 +119,11 @@ static void testGoldenTeleEncode() {
 // CRC16 已知向量: 空输入 / "123456789" (MODBUS 标准)
 static void testCrc16Vectors() {
     const uint8_t empty = 0;
-    CHECK(rovi::crc16({&empty, 0}) == 0xFFFF);
+    CHECK(ou::crc16({&empty, 0}) == 0xFFFF);
 
     const std::vector<uint8_t> data = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
     // CRC-16/MODBUS 对 "123456789" 的校验值 = 0x4B37
-    CHECK(rovi::crc16(data) == 0x4B37);
+    CHECK(ou::crc16(data) == 0x4B37);
 }
 
 // 解析流: 含噪声前缀 + 完整帧 + 尾部数据
@@ -131,35 +131,35 @@ static void testParseStream() {
     std::vector<uint8_t> stream;
     stream.push_back(0x00);  // 噪声
     stream.push_back(0x01);
-    const auto frame = rovi::encodeCmd(makeCmd());
+    const auto frame = ou::encodeCmd(makeCmd());
     stream.insert(stream.end(), frame.begin(), frame.end());
     stream.push_back(0xFF);  // 尾部噪声
 
     CmdPacket out{};
-    CHECK(rovi::parseCmdStream(stream, out));
+    CHECK(ou::parseCmdStream(stream, out));
     CHECK(out.surge == 0.5f);
     CHECK(out.arm == 50.0f);
 }
 
 // 错误路径: CRC 损坏 / 类型错误 / 帧不完整
 static void testErrorPaths() {
-    auto frame = rovi::encodeCmd(makeCmd());
+    auto frame = ou::encodeCmd(makeCmd());
 
     // CRC 损坏
     auto bad = frame;
     bad[bad.size() - 1] ^= 0xFF;
-    CHECK(!rovi::decodeCmd(bad).has_value());
+    CHECK(!ou::decodeCmd(bad).has_value());
 
     // 类型错误: 把 Cmd 帧类型改成 Tele
     auto wrong_type = frame;
-    wrong_type[3] = rovi::kTypeTele;
-    CHECK(!rovi::decodeCmd(wrong_type).has_value());
-    CHECK(!rovi::decodeTele(wrong_type).has_value());
+    wrong_type[3] = ou::kTypeTele;
+    CHECK(!ou::decodeCmd(wrong_type).has_value());
+    CHECK(!ou::decodeTele(wrong_type).has_value());
 
     // 帧不完整 (截断)
     auto truncated = frame;
     truncated.pop_back();
-    CHECK(!rovi::decodeCmd(truncated).has_value());
+    CHECK(!ou::decodeCmd(truncated).has_value());
 }
 
 int main() {
