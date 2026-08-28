@@ -31,9 +31,21 @@ target_include_directories(ou_proto PUBLIC
 )
 target_compile_definitions(ou_proto PUBLIC OU_PROTO_NAMESPACE=ou)
 
+# 传输库: 纯字节通道 (无外部依赖, POSIX/Windows 原生 API)
+add_library(ou_channel
+    src/udp_channel.cpp
+    src/serial_channel.cpp
+)
+add_library(ou::channel ALIAS ou_channel)
+
+target_include_directories(ou_channel PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
 # 安装规则: 供 ROVAPP 以 find_package(ou_sdk) 或 add_subdirectory 消费
 include(GNUInstallDirs)
-install(TARGETS ou_proto
+install(TARGETS ou_proto ou_channel
     EXPORT ou_sdkTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
