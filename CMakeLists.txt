@@ -26,6 +26,7 @@ add_library(ou::proto ALIAS ou_proto)
 
 target_include_directories(ou_proto PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/generated>
     $<INSTALL_INTERFACE:include>
 )
 target_compile_definitions(ou_proto PUBLIC OU_PROTO_NAMESPACE=ou)
@@ -39,6 +40,7 @@ install(TARGETS ou_proto
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY generated/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT ou_sdkTargets
     NAMESPACE ou::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ou_sdk
