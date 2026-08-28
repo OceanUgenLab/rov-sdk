@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: 构建 + 测试
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: 配置
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: 构建
+        run: cmake --build build
+
+      - name: 测试
+        run: ctest --test-dir build --output-on-failure
+
+  examples:
+    name: 示例独立构建
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: 构建 host_command_sender
+        run: |
+          cmake -S examples/host_command_sender -B /tmp/ex-host -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/ex-host
+
+      - name: 构建 board_telemetry_receiver
+        run: |
+          cmake -S examples/board_telemetry_receiver -B /tmp/ex-board -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/ex-board
