@@ -1,13 +1,13 @@
-# ou_sdk 通信协议 v0.2.0 中立 schema
+# ou_sdk 通信协议 v0.3.0 中立 schema
 # 本文件为协议实现的唯一手写真源，codegen 据此生成 C++ 头 / C 头 / .md / .msg。
-# v0.2.0 为硬切协议：ver=0x02，旧 v0.1.0 作废，无向后兼容。
+# v0.3.0 为硬切协议：ver=0x03，旧 v0.2.0（CmdPacket/TelemetryPacket）作废，无向后兼容。
 
-version: 0x02
+version: 0x03
 
 # 帧级元信息（所有帧共享）
 frame:
   stx: 0xAA55           # 帧头 2 字节，小端呈现为 0xAA 0x55
-  version: 0x02         # 协议版本 1 字节，v0.2.0 固定为 0x02
+  version: 0x03         # 协议版本 1 字节，v0.3.0 固定为 0x03
   len_includes: payload only  # len = payload 字节数，不含帧头、不含 CRC
   endian: little        # 字节序固定小端（与 STM32 一致）
   float: float32        # 浮点一律 IEEE-754 float32，位模式传输
@@ -20,7 +20,14 @@ frame:
 # 类型别名（codegen 映射用）
 types:
   u8: uint8
+  u16: uint16
+  u32: uint32
+  u64: uint64
+  i8: int8
+  i16: int16
+  i32: int32
   f32: float32
+  char: char
 
 # 枚举定义
 enums:
@@ -28,210 +35,240 @@ enums:
     type: u8
     values:
       MANUAL: 0   # 手动遥控
-      AUTO: 1     # 自动控制
+      AUTO: 1     # 自动任务
       RETURN: 2   # 一键返航
-      HOLD: 3     # 悬停保持
+      HOLD: 3     # 定点保持
+  SystemState:
+    type: u8
+    values:
+      UNINIT: 0       # 上电自检中
+      BOOT: 1         # 引导/系统初始化
+      CALIBRATING: 2  # 校准中，禁止解锁
+      STANDBY: 3      # 就绪，未解锁
+      ARMED: 4        # 已解锁，推进器可出力
+      ACTIVE: 5       # 作业中
+      CRITICAL: 6     # 严重故障，可挽救
+      EMERGENCY: 7    # 紧急（漏水/失控），执行安全行为
+  CommandId:
+    type: u16
+    values:
+      CMD_SET_MODE: 1     # param 低 16 位 = Mode 枚举值
+      CMD_ARM: 2          # param 低 16 位：0=上锁，1=解锁
+      CMD_GO_HOME: 4      # 预留
+      CMD_SET_STREAM: 5   # param 高 16 位=目标帧 type，低 16 位=0 关 / 1 开
+      CMD_SET_PWM: 6      # param 高 16 位=辅助通道 1..16，低 16 位=PWM us
 
-# 帧定义
+# 帧定义（type 号段：0x10..0x2F 上行，0x30..0x4F 下行，0x50..0x5F 双向；
+# 0x01/0x02/0x11/0x12/0x17/0x1A 前代或保留号，不复用）
 frames:
-  CmdPacket:
-    type: 0x01
-    direction: down  # 主控 -> 从控
-    notes: 控制指令帧，payload 52 字节
+  Heartbeat:
+    type: 0x50
+    direction: both
+    notes: 心跳，双向 1 Hz；armed 判断 = state >= ARMED 且 < CRITICAL
     fields:
-      - name: mode
-        type: u8
-        unit: ""
-        range: {0: MANUAL, 1: AUTO, 2: RETURN, 3: HOLD}
-        notes: 运行模式
-      - name: armed
-        type: u8
-        unit: ""
-        range: [0, 1]
-        notes: 解锁标志，1=armed 输出推进器，0=停机
-      - name: reserved
-        type: u8
-        unit: ""
-        range: [0, 0]
-        notes: 保留，发送方清零，接收方忽略
-        count: 2
-      - name: surge
-        type: f32
-        unit: ""
-        range: [-1.0, 1.0]
-        notes: 前(+) / 后(-)
-      - name: sway
-        type: f32
-        unit: ""
-        range: [-1.0, 1.0]
-        notes: 右平移(+) / 左平移(-)
-      - name: heave
-        type: f32
-        unit: ""
-        range: [-1.0, 1.0]
-        notes: 上浮(+) / 下潜(-)
-      - name: yaw
-        type: f32
-        unit: ""
-        range: [-1.0, 1.0]
-        notes: 右转(+) / 左转(-)
-      - name: target_depth
-        type: f32
-        unit: m
-        range: [0.0, 300.0]
-        notes: 目标深度
-      - name: target_heading
-        type: f32
-        unit: deg
-        range: [0.0, 360.0]
-        notes: 目标航向
-      - name: target_north
-        type: f32
-        unit: m
-        range: [-10000.0, 10000.0]
-        notes: v2, firmware v1 ignores（目标北向位移，寻迹/返航用）
-      - name: target_east
-        type: f32
-        unit: m
-        range: [-10000.0, 10000.0]
-        notes: v2, firmware v1 ignores（目标东向位移，寻迹/返航用）
-      - name: reserved_tail
-        type: u8
-        unit: ""
-        range: [0, 0]
-        notes: 扩展预留区（云台/机械臂/照明等后置），发送方清零，接收方忽略
-        count: 16
+      - {name: mode, type: u8, unit: "", range: {0: MANUAL, 1: AUTO, 2: RETURN, 3: HOLD}, notes: 当前运行模式（权威来源）}
+      - {name: system_type, type: u8, unit: "", range: [0, 255], notes: bit0 角色 0=机器人 1=地面站；bit1..7 产品序号}
+      - {name: fw_version, type: u8, unit: "", range: [0, 255], notes: 发送方固件/SDK 主版本号}
+      - {name: system_state, type: u8, unit: "", range: {0: UNINIT, 7: EMERGENCY}, notes: SystemState 枚举}
 
-  TelemetryPacket:
-    type: 0x02
-    direction: up  # 从控 -> 主控
-    notes: 遥测帧，payload 128 字节
+  SysStatus:
+    type: 0x10
+    direction: up
+    notes: 系统健康 + 电池 + 链路统计 + 遥测开关，1 Hz
     fields:
-      - name: roll
-        type: f32
-        unit: deg
-        range: [-180.0, 180.0]
-        notes: 横滚角
-      - name: pitch
-        type: f32
-        unit: deg
-        range: [-90.0, 90.0]
-        notes: 俯仰角
-      - name: heading
-        type: f32
-        unit: deg
-        range: [0.0, 360.0]
-        notes: 航向角
-      - name: yaw_rate
-        type: f32
-        unit: deg/s
-        range: [-180.0, 180.0]
-        notes: 偏航角速度
-      - name: depth
-        type: f32
-        unit: m
-        range: [0.0, 300.0]
-        notes: 水深
-      - name: altitude
-        type: f32
-        unit: m
-        range: [0.0, 100.0]
-        notes: 距底高度
-      - name: north
-        type: f32
-        unit: m
-        range: [-10000.0, 10000.0]
-        notes: 相对原点北向位移
-      - name: east
-        type: f32
-        unit: m
-        range: [-10000.0, 10000.0]
-        notes: 相对原点东向位移
-      - name: vn
-        type: f32
-        unit: m/s
-        range: [-10.0, 10.0]
-        notes: 北向速度
-      - name: ve
-        type: f32
-        unit: m/s
-        range: [-10.0, 10.0]
-        notes: 东向速度
-      - name: vd
-        type: f32
-        unit: m/s
-        range: [-10.0, 10.0]
-        notes: 下潜速度（向下为正）
-      - name: voltage
-        type: f32
-        unit: V
-        range: [0.0, 60.0]
-        notes: 电池电压
-      - name: current
-        type: f32
-        unit: A
-        range: [0.0, 100.0]
-        notes: 电池电流
-      - name: percent
-        type: f32
-        unit: "%"
-        range: [0.0, 100.0]
-        notes: 电池电量百分比
-      - name: temperature
-        type: f32
-        unit: "°C"
-        range: [-10.0, 60.0]
-        notes: 电池/舱内温度
-      - name: water_temp
-        type: f32
-        unit: "°C"
-        range: [-5.0, 45.0]
-        notes: 水温
-      - name: salinity
-        type: f32
-        unit: PSU
-        range: [0.0, 45.0]
-        notes: 盐度
-      - name: pressure_bar
-        type: f32
-        unit: bar
-        range: [0.0, 40.0]
-        notes: 水压
-      - name: cable_tension
-        type: f32
-        unit: N
-        range: [0.0, 1000.0]
-        notes: 缆绳张力
-      - name: thr
-        type: f32
-        unit: "%"
-        range: [-1.0, 1.0]
-        notes: 8 路推进器输出百分比
-        count: 8
-      - name: leak
-        type: u8
-        unit: ""
-        range: [0, 1]
-        notes: 漏水检测，1=报警
-      - name: armed
-        type: u8
-        unit: ""
-        range: [0, 1]
-        notes: 当前 armed 状态
-      - name: mode
-        type: u8
-        unit: ""
-        range: {0: MANUAL, 1: AUTO, 2: RETURN, 3: HOLD}
-        notes: 当前运行模式
-      - name: reserved
-        type: u8
-        unit: ""
-        range: [0, 0]
-        notes: 保留，发送方清零，接收方忽略
-        count: 1
-      - name: reserved_tail
-        type: u8
-        unit: ""
-        range: [0, 0]
-        notes: 扩展预留区（云台/机械臂/照明等后置），发送方清零，接收方忽略
-        count: 16
+      - {name: sensors_present, type: u32, unit: "", range: [0, 4294967295], notes: 已安装传感器位图}
+      - {name: sensors_enabled, type: u32, unit: "", range: [0, 4294967295], notes: 已启用传感器位图}
+      - {name: sensors_health, type: u32, unit: "", range: [0, 4294967295], notes: 传感器健康位图}
+      - {name: load, type: u16, unit: "%x10", range: [0, 1000], notes: CPU 负载 %×10}
+      - {name: voltage_total, type: u16, unit: mV, range: [0, 65535], notes: 电池总电压，65535=未知}
+      - {name: voltage_cell_max, type: u16, unit: mV, range: [0, 65535], notes: 单体最高电压，65535=未知}
+      - {name: voltage_cell_min, type: u16, unit: mV, range: [0, 65535], notes: 单体最低电压，65535=未知}
+      - {name: current_battery, type: i16, unit: cA, range: [-1, 32767], notes: 电池电流，-1=未知}
+      - {name: battery_remaining, type: i8, unit: "%", range: [-1, 100], notes: 剩余百分比，-1=未知}
+      - {name: current_consumed, type: i32, unit: mAh, range: [-1, 2147483647], notes: 已消耗容量，-1=未知}
+      - {name: battery_temperature, type: i16, unit: "°Cx100", range: [-32768, 32767], notes: 电池温度 °C×100}
+      - {name: battery_fault_bitmask, type: u32, unit: "", range: [0, 4294967295], notes: 电池故障位图}
+      - {name: drop_rate_comm, type: u16, unit: "%x100", range: [0, 65535], notes: 丢包率 %×100}
+      - {name: errors_comm, type: u16, unit: "", range: [0, 65535], notes: 通信错误计数}
+      - {name: errors_count, type: u16, unit: "", range: [0, 65535], notes: 系统错误计数, count: 4}
+      - {name: stream_mask, type: u32, unit: "", range: [0, 7], notes: 回显帧开关位图 bit0=GpsRawInt bit1=RcChannels bit2=ServoOutputRaw}
+
+  CommandAck:
+    type: 0x51
+    direction: up
+    notes: 命令应答，与 Command 的 command 字段对号
+    fields:
+      - {name: command, type: u16, unit: "", range: [1, 65535], notes: 被确认的命令号（Command 枚举）}
+      - {name: result, type: u8, unit: "", range: [0, 5], notes: 0 接受 1 暂时拒绝 2 拒绝 3 不支持 4 失败 5 进行中}
+      - {name: progress, type: u8, unit: "%", range: [0, 100], notes: 进度百分比}
+      - {name: result_param2, type: i32, unit: "", range: [-2147483648, 2147483647], notes: 附加结果参数}
+
+  PoseNed:
+    type: 0x13
+    direction: up
+    notes: 姿态 + 本地 NED 位置/速度，10–50 Hz；姿态与位置共享时间戳
+    fields:
+      - {name: time_boot_ms, type: u32, unit: ms, range: [0, 4294967295], notes: 开机毫秒时间戳}
+      - {name: roll, type: f32, unit: rad, range: [-3.14159265, 3.14159265], notes: 横滚角}
+      - {name: pitch, type: f32, unit: rad, range: [-1.57079633, 1.57079633], notes: 俯仰角}
+      - {name: yaw, type: f32, unit: rad, range: [-3.14159265, 3.14159265], notes: 偏航角}
+      - {name: rollspeed, type: f32, unit: rad/s, range: [-10.0, 10.0], notes: 横滚角速度}
+      - {name: pitchspeed, type: f32, unit: rad/s, range: [-10.0, 10.0], notes: 俯仰角速度}
+      - {name: yawspeed, type: f32, unit: rad/s, range: [-10.0, 10.0], notes: 偏航角速度}
+      - {name: x, type: f32, unit: m, range: [-10000.0, 10000.0], notes: 北向位置（NED）}
+      - {name: y, type: f32, unit: m, range: [-10000.0, 10000.0], notes: 东向位置（NED）}
+      - {name: z, type: f32, unit: m, range: [-10000.0, 10000.0], notes: 下向位置（NED）}
+      - {name: vx, type: f32, unit: m/s, range: [-10.0, 10.0], notes: 北向速度}
+      - {name: vy, type: f32, unit: m/s, range: [-10.0, 10.0], notes: 东向速度}
+      - {name: vz, type: f32, unit: m/s, range: [-10.0, 10.0], notes: 下向速度}
+
+  EkfStatusReport:
+    type: 0x14
+    direction: up
+    notes: EKF 健康/方差，1 Hz；方差均为 ×100 编码
+    fields:
+      - {name: flags, type: u16, unit: "", range: [0, 65535], notes: EKF 健康/融合状态位}
+      - {name: velocity_variance, type: u8, unit: "x100", range: [0, 255], notes: 速度方差×100}
+      - {name: pos_horiz_variance, type: u8, unit: "x100", range: [0, 255], notes: 水平位置方差×100}
+      - {name: pos_vert_variance, type: u8, unit: "x100", range: [0, 255], notes: 垂直位置方差×100}
+      - {name: compass_variance, type: u8, unit: "x100", range: [0, 255], notes: 罗盘方差×100}
+      - {name: terrain_alt_variance, type: u8, unit: "x100", range: [0, 255], notes: 地形高度方差×100}
+
+  VfrHud:
+    type: 0x15
+    direction: up
+    notes: 人工仪表量，1–5 Hz
+    fields:
+      - {name: airspeed, type: f32, unit: m/s, range: [0.0, 10.0], notes: 水航速（无传感器填 0）}
+      - {name: groundspeed, type: f32, unit: m/s, range: [0.0, 10.0], notes: 对地速度}
+      - {name: heading, type: i16, unit: deg, range: [0, 359], notes: 航向角}
+      - {name: throttle, type: u16, unit: "%", range: [0, 100], notes: 油门档位}
+      - {name: alt, type: f32, unit: m, range: [0.0, 100.0], notes: 距底高度（与 WaterDepth.altitude 同义）}
+      - {name: climb, type: f32, unit: m/s, range: [-5.0, 5.0], notes: 垂直速度，上浮为正}
+
+  GlobalPositionInt:
+    type: 0x16
+    direction: up
+    notes: 全局经纬高 + NED 速度，1 Hz
+    fields:
+      - {name: time_boot_ms, type: u32, unit: ms, range: [0, 4294967295], notes: 开机毫秒时间戳}
+      - {name: lat, type: i32, unit: degE7, range: [-900000000, 900000000], notes: 纬度×1e7}
+      - {name: lon, type: i32, unit: degE7, range: [-1800000000, 1800000000], notes: 经度×1e7}
+      - {name: alt, type: i32, unit: mm, range: [-2147483648, 2147483647], notes: 海拔高度 AMSL}
+      - {name: relative_alt, type: i32, unit: mm, range: [-2147483648, 2147483647], notes: 相对 Home 高度}
+      - {name: vx, type: i16, unit: cm/s, range: [-32768, 32767], notes: 北向速度}
+      - {name: vy, type: i16, unit: cm/s, range: [-32768, 32767], notes: 东向速度}
+      - {name: vz, type: i16, unit: cm/s, range: [-32768, 32767], notes: 下向速度}
+      - {name: hdg, type: u16, unit: cdeg, range: [0, 35999], notes: 航向×100，65535=未知}
+
+  GpsRawInt:
+    type: 0x18
+    direction: up
+    notes: GPS 原始回显，默认关闭，由 CMD_SET_STREAM 开启
+    fields:
+      - {name: time_usec, type: u64, unit: us, range: [0, 18446744073709551615], notes: us 级时间戳}
+      - {name: fix_type, type: u8, unit: "", range: [0, 255], notes: 定位类型枚举}
+      - {name: lat, type: i32, unit: degE7, range: [-900000000, 900000000], notes: 纬度×1e7}
+      - {name: lon, type: i32, unit: degE7, range: [-1800000000, 1800000000], notes: 经度×1e7}
+      - {name: alt, type: i32, unit: mm, range: [-2147483648, 2147483647], notes: 海拔高度}
+      - {name: eph, type: u16, unit: cm, range: [0, 65535], notes: 水平精度×100，65535=未知}
+      - {name: epv, type: u16, unit: cm, range: [0, 65535], notes: 垂直精度×100，65535=未知}
+      - {name: vel, type: u16, unit: cm/s, range: [0, 65535], notes: 地速}
+      - {name: cog, type: u16, unit: cdeg, range: [0, 35999], notes: 航向×100}
+      - {name: satellites_visible, type: u8, unit: "", range: [0, 255], notes: 可见卫星数}
+      - {name: h_acc, type: u32, unit: mm, range: [0, 4294967295], notes: 水平精度}
+      - {name: v_acc, type: u32, unit: mm, range: [0, 4294967295], notes: 垂直精度}
+      - {name: vel_acc, type: u32, unit: mm/s, range: [0, 4294967295], notes: 速度精度}
+      - {name: hdg_acc, type: u32, unit: "cdegE-2", range: [0, 4294967295], notes: 航向精度}
+
+  WaterDepth:
+    type: 0x19
+    direction: up
+    notes: 水深/距底/水温（Sub 关键帧），1–10 Hz
+    fields:
+      - {name: time_boot_ms, type: u32, unit: ms, range: [0, 4294967295], notes: 开机毫秒时间戳}
+      - {name: id, type: u8, unit: "", range: [0, 255], notes: 传感器 ID}
+      - {name: healthy, type: u8, unit: "", range: [0, 1], notes: 健康状态}
+      - {name: lat, type: i32, unit: degE7, range: [-900000000, 900000000], notes: 纬度×1e7，可选}
+      - {name: lng, type: i32, unit: degE7, range: [-1800000000, 1800000000], notes: 经度×1e7，可选}
+      - {name: altitude, type: f32, unit: m, range: [0.0, 100.0], notes: 距底高度}
+      - {name: bottom_distance, type: f32, unit: m, range: [0.0, 300.0], notes: 到水底距离}
+      - {name: terrain_height, type: f32, unit: m, range: [-300.0, 300.0], notes: 地形高度}
+      - {name: temperature, type: f32, unit: "°C", range: [-5.0, 45.0], notes: 水温}
+
+  DistanceSensor:
+    type: 0x52
+    direction: both
+    notes: 测距（避碰声呐），事件/1 Hz
+    fields:
+      - {name: time_boot_ms, type: u32, unit: ms, range: [0, 4294967295], notes: 开机毫秒时间戳}
+      - {name: min_distance, type: u16, unit: cm, range: [0, 65535], notes: 量程下限}
+      - {name: max_distance, type: u16, unit: cm, range: [0, 65535], notes: 量程上限}
+      - {name: current_distance, type: u16, unit: cm, range: [0, 65535], notes: 当前距离}
+      - {name: type, type: u8, unit: "", range: [0, 255], notes: 测距类型}
+      - {name: id, type: u8, unit: "", range: [0, 255], notes: 传感器 ID}
+      - {name: orientation, type: u8, unit: "", range: [0, 255], notes: 朝向}
+      - {name: covariance, type: u8, unit: cm2, range: [0, 255], notes: 协方差，255=未知}
+      - {name: horizontal_fov, type: f32, unit: rad, range: [0.0, 6.28318531], notes: 水平视场角}
+      - {name: vertical_fov, type: f32, unit: rad, range: [0.0, 6.28318531], notes: 垂直视场角}
+      - {name: signal_quality, type: u8, unit: "", range: [0, 100], notes: 信号质量，255=未知}
+
+  ManualControl:
+    type: 0x30
+    direction: down
+    notes: 六轴速度/角速度指令，10–50 Hz；杆量 0 = 该轴交由飞控自稳；sequence 不递增或输入超时（约 500 ms）即 failsafe
+    fields:
+      - {name: sequence, type: u16, unit: "", range: [0, 65535], notes: 递增序号，丢包/乱序检测}
+      - {name: x, type: i16, unit: "", range: [-1000, 1000], notes: 前后速度 surge}
+      - {name: y, type: i16, unit: "", range: [-1000, 1000], notes: 横移速度 sway}
+      - {name: z, type: i16, unit: "", range: [-1000, 1000], notes: 升沉速度 heave}
+      - {name: p, type: i16, unit: "", range: [-1000, 1000], notes: 俯仰角速度 pitch rate}
+      - {name: r, type: i16, unit: "", range: [-1000, 1000], notes: 横滚角速度 roll rate}
+      - {name: yaw, type: i16, unit: "", range: [-1000, 1000], notes: 偏航角速度 yaw rate}
+
+  Command:
+    type: 0x32
+    direction: down
+    notes: 命令帧；飞控以 CommandAck 应答，超时 0.5–1 s 重发
+    fields:
+      - {name: command, type: u16, unit: "", range: [1, 65535], notes: Command 枚举}
+      - {name: param, type: u32, unit: "", range: [0, 4294967295], notes: 命令参数，按命令定义解释}
+
+  RcChannels:
+    type: 0x1A
+    direction: up
+    notes: 遥控通道回显，默认关闭，由 CMD_SET_STREAM 开启
+    fields:
+      - {name: time_boot_ms, type: u32, unit: ms, range: [0, 4294967295], notes: 开机毫秒时间戳}
+      - {name: chancount, type: u8, unit: "", range: [0, 18], notes: 有效通道数}
+      - {name: chan_raw, type: u16, unit: us, range: [0, 65535], notes: 18 路通道原始值，65535=无效, count: 18}
+      - {name: rssi, type: u8, unit: "", range: [0, 100], notes: 遥控链路强度，255=未知}
+
+  ServoOutputRaw:
+    type: 0x1B
+    direction: up
+    notes: 执行器 PWM 输出回显，默认关闭，由 CMD_SET_STREAM 开启
+    fields:
+      - {name: time_boot_ms, type: u32, unit: ms, range: [0, 4294967295], notes: ms 级时间戳}
+      - {name: port, type: u8, unit: "", range: [0, 255], notes: 输出端口}
+      - {name: servo_raw, type: u16, unit: us, range: [0, 65535], notes: 16 路 PWM 输出, count: 16}
+
+  ParamSet:
+    type: 0x33
+    direction: down
+    notes: 写参数
+    fields:
+      - {name: param_id, type: char, unit: "", range: "", notes: 参数名, count: 16}
+      - {name: param_value, type: f32, unit: "", range: [-3.4e38, 3.4e38], notes: 目标值}
+      - {name: param_type, type: u8, unit: "", range: [0, 255], notes: OU 类型枚举}
+
+  ParamValue:
+    type: 0x1D
+    direction: up
+    notes: 参数值回读（飞控实际保存值，非请求值回显）
+    fields:
+      - {name: param_id, type: char, unit: "", range: "", notes: 参数名, count: 16}
+      - {name: param_value, type: f32, unit: "", range: [-3.4e38, 3.4e38], notes: 实际保存值}
+      - {name: param_type, type: u8, unit: "", range: [0, 255], notes: OU 类型枚举}
+      - {name: param_count, type: u16, unit: "", range: [0, 65535], notes: 参数总数}
+      - {name: param_index, type: u16, unit: "", range: [0, 65535], notes: 当前序号}

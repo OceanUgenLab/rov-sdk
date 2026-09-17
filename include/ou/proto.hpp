@@ -1,23 +1,21 @@
-// ou_sdk v0.2.0 协议手写公共头
-// 包含 FrameParser、packet_traits、decode 模板与 crc16 声明。
-// 结构体/常量/encode 基础声明来自 codegen 产物 <ou/protocol.hpp>。
+// ou_sdk v0.3.0 协议手写公共头
+// 包含 FrameParser 与 crc16 声明。
+// 各帧结构体/常量/encode/decode 均由 codegen 产物 <ou/protocol.hpp> 内联提供。
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <type_traits>
 #include <vector>
 
-#include <ou/protocol.hpp>  // generated: CmdPacket, TelemetryPacket, constants, encodeCmd/decodeCmd
+#include <ou/protocol.hpp>  // generated: frames, encodeX/decodeX, packet_traits
 
 namespace ou {
 
 // CRC-16/MODBUS (init 0xFFFF, poly 0xA001 反射)
 uint16_t crc16(std::span<const uint8_t> data);
 
-// 有状态流式帧切分器：从字节流中提取完整 v0.2.0 帧
+// 有状态流式帧切分器：从字节流中提取完整 v0.3.0 帧
 class FrameParser {
 public:
     FrameParser() = default;
@@ -35,31 +33,32 @@ private:
     std::vector<uint8_t> buf_;
 };
 
-// 类型 → type 字节映射
+// 从完整帧中取出 type 字节
+inline uint8_t frame_type(std::span<const uint8_t> frame) {
+    return frame.size() >= 5 ? frame[4] : 0;
+}
+
+// 从完整帧中取出 payload 视图（不含帧头与 CRC）
+inline std::span<const uint8_t> frame_payload(std::span<const uint8_t> frame) {
+    if (frame.size() < kFrameOverhead) {
+        return {};
+    }
+    const size_t len = frame[3];
+    if (frame.size() < kFrameOverhead + len) {
+        return {};
+    }
+    return frame.subspan(5, len);
+}
+
+// 泛型编解码：按 packet_traits 分发到 codegen 生成的 encodeX/decodeX
 template <typename Pkt>
-struct packet_traits;
+std::vector<uint8_t> encode(const Pkt& pkt) {
+    return packet_traits<Pkt>::encode(pkt);
+}
 
-template <>
-struct packet_traits<CmdPacket> {
-    static constexpr uint8_t type = kTypeCmd;
-};
-
-template <>
-struct packet_traits<TelemetryPacket> {
-    static constexpr uint8_t type = kTypeTele;
-};
-
-// 类型分发解码
 template <typename Pkt>
 std::optional<Pkt> decode(std::span<const uint8_t> frame) {
-    if constexpr (std::is_same_v<Pkt, CmdPacket>) {
-        return decodeCmd(frame);
-    } else if constexpr (std::is_same_v<Pkt, TelemetryPacket>) {
-        return decodeTele(frame);
-    } else {
-        static_assert(sizeof(Pkt) == 0, "unsupported packet type for ou::decode");
-        return std::nullopt;
-    }
+    return packet_traits<Pkt>::decode(frame);
 }
 
 }  // namespace ou

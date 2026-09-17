@@ -27,7 +27,7 @@ ctest --test-dir build --output-on-failure
 ### 第一段代码：上位机发一条控制指令
 
 ```cpp
-#include <ou/protocol.hpp>    // CmdPacket、encodeCmd
+#include <ou/protocol.hpp>    // ManualControl、encodeManualControl
 #include <ou/udp_channel.hpp> // UdpChannel
 #include <ou/frame_link.hpp>  // UdpFrameLink
 
@@ -38,12 +38,13 @@ int main() {
 
     ou::UdpFrameLink link(channel);
 
-    ou::CmdPacket cmd;
-    cmd.armed = 1;      // 解锁
-    cmd.surge  = 0.5f;  // 前进半速
+    ou::ManualControl ctrl;         // 六轴速度指令（0 = 该轴交由飞控自稳）
+    ctrl.sequence = 1;
+    ctrl.x = 600;                   // 前进 60%
+    ctrl.yaw = -100;                // 左偏航 10%
 
-    auto frame = ou::encodeCmd(cmd);   // 编码为完整帧（含 CRC）
-    link.send_frame(frame);            // 发送
+    auto frame = ou::encodeManualControl(ctrl);  // 编码为完整帧（含 CRC）
+    link.send_frame(frame);                       // 发送
 }
 ```
 
@@ -58,7 +59,7 @@ int main() {
 flowchart TB
     L["link 组合层 (ou::link)<br/>FrameLink / UdpFrameLink / SerialFrameLink<br/>send_frame · recv_frame · recv_frame_as&lt;Pkt&gt;（类型安全）"]
     C["channel 字节搬运层 (ou::channel)<br/>FrameChannel / UdpChannel / SerialChannel<br/>纯字节收发，不组帧、不解析 STX/CRC"]
-    P["proto 编解码层 (ou::proto)<br/>crc16 · encodeCmd/Tele · decodeCmd/Tele · FrameParser<br/>有状态流式切帧（滑动窗口，容忍噪声/粘包）"]
+    P["proto 编解码层 (ou::proto)<br/>crc16 · encode&lt;Pkt&gt;/decode&lt;Pkt&gt;（16 帧，codegen 内联生成）· FrameParser<br/>有状态流式切帧（滑动窗口，容忍噪声/粘包）"]
 
     L --> C --> P
 ```
@@ -73,7 +74,7 @@ flowchart TB
 
 ## 协议
 
-帧格式 `AA 55 | ver | len | type | payload | crc16`（v0.2.0，`ver=0x02`）的完整定义与 golden 帧向量见 [`generated/docs/protocol.md`](generated/docs/protocol.md)。协议为三端（上位机 SDK / 算力板 / STM32 固件）公共接口，本仓库为实现与文档持有方。
+帧格式 `AA 55 | ver | len | type | payload | crc16`（v0.3.0，`ver=0x03`，16 帧）的完整定义与 golden 帧向量见 [`generated/docs/protocol.md`](generated/docs/protocol.md)。协议为三端（上位机 SDK / 算力板 / STM32 固件）公共接口，本仓库为实现与文档持有方。
 
 **协议修改的唯一路径**（详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)）：
 

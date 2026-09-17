@@ -1,11 +1,13 @@
-// 算力板收遥测最小示例：ou::UdpFrameLink::recv_frame_as<ou::TelemetryPacket> 收帧并打印关键字段
+// 算力板收遥测最小示例：UdpFrameLink::recv_frame + 按帧 type 分发解码打印
 //
 // 运行：
 //   ./board_telemetry_receiver [监听端口]
-//   默认监听 9091。收到 type=0x02 的遥测帧后解码并打印；type 不匹配的帧会被丢弃并继续等待。
-#include <ou/protocol.hpp>   // TelemetryPacket（codegen 生成）
-#include <ou/frame_link.hpp> // UdpFrameLink、recv_frame_as<Pkt>
-#include <ou/udp_channel.hpp>// UdpChannel
+//   默认监听 9091。循环接收，按 type 解码 Heartbeat / PoseNed / WaterDepth / SysStatus；
+// type 不匹配的帧跳过，Ctrl+C 退出。
+#include <ou/proto.hpp>       // frame_type、decode<Pkt>
+#include <ou/frame_link.hpp>  // UdpFrameLink
+#include <ou/protocol.hpp>    // 各帧（codegen 生成）
+#include <ou/udp_channel.hpp> // UdpChannel
 
 #include <chrono>
 #include <cstdint>
@@ -24,33 +26,65 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // 2. 组合层：UdpFrameLink 提供类型安全的模板收帧
+    // 2. 组合层
     ou::UdpFrameLink link(channel);
-
-    std::printf("监听 0.0.0.0:%u，等待遥测帧（type=0x02）...\n",
+    std::printf("监听 0.0.0.0:%u，循环接收遥测帧...\n",
                 static_cast<unsigned>(local_port));
 
-    // 3. 阻塞接收一条遥测（5 秒超时）；type 不匹配的帧会被自动跳过
-    auto tele =
-        link.recv_frame_as<ou::TelemetryPacket>(std::chrono::seconds(5));
-    if (!tele.has_value()) {
-        std::fprintf(stderr, "5 秒内未收到遥测帧\n");
-        return 1;
-    }
+    while (true) {
+        // 3. 收一条完整帧（5 秒超时）
+        auto frame = link.recv_frame(std::chrono::seconds(5));
+        if (!frame.has_value()) {
+            std::printf("5 秒未收到帧，继续等待\n");
+            continue;
+        }
 
-    // 4. 打印关键字段
-    std::printf("遥测：深度=%.2f m  航向=%.1f°  横滚=%.1f°  俯仰=%.1f°\n",
-                tele->depth, tele->heading, tele->roll, tele->pitch);
-    std::printf("电池：%.2f V  %.0f%%  水温=%.1f°C\n", tele->voltage,
-                tele->percent, tele->water_temp);
-    std::printf("8 路推进器：");
-    for (int i = 0; i < 8; ++i) {
-        std::printf("%.2f ", tele->thr[i]);
+        // 4. 按 type 分发解码
+        switch (ou::frame_type(*frame)) {
+        case ou::kTypeHeartbeat: {
+            const auto hb = ou::decode<ou::Heartbeat>(*frame);
+            if (hb) {
+                std::printf("[心跳] mode=%u state=%u fw=%u type=0x%02X\n",
+                            static_cast<unsigned>(hb->mode),
+                            static_cast<unsigned>(hb->system_state),
+                            static_cast<unsigned>(hb->fw_version),
+                            static_cast<unsigned>(hb->system_type));
+            }
+            break;
+        }
+        case ou::kTypePoseNed: {
+            const auto p = ou::decode<ou::PoseNed>(*frame);
+            if (p) {
+                std::printf("[位姿] roll=%.2f pitch=%.2f yaw=%.2f z=%.2f vx=%.2f\n",
+                            p->roll, p->pitch, p->yaw, p->z, p->vx);
+            }
+            break;
+        }
+        case ou::kTypeWaterDepth: {
+            const auto w = ou::decode<ou::WaterDepth>(*frame);
+            if (w) {
+                std::printf("[水深] bottom=%.2f m altitude=%.2f m temp=%.1f°C healthy=%u\n",
+                            w->bottom_distance, w->altitude, w->temperature,
+                            static_cast<unsigned>(w->healthy));
+            }
+            break;
+        }
+        case ou::kTypeSysStatus: {
+            const auto s = ou::decode<ou::SysStatus>(*frame);
+            if (s) {
+                std::printf("[系统] batt=%.2fV %.0f%% load=%u.%u%% stream_mask=0x%X\n",
+                            s->voltage_total / 1000.0f,
+                            static_cast<double>(s->battery_remaining),
+                            static_cast<unsigned>(s->load / 10),
+                            static_cast<unsigned>(s->load % 10),
+                            static_cast<unsigned>(s->stream_mask));
+            }
+            break;
+        }
+        default:
+            std::printf("[其他] type=0x%02X %zu 字节，跳过\n",
+                        static_cast<unsigned>(ou::frame_type(*frame)), frame->size());
+            break;
+        }
     }
-    std::printf("\n");
-    std::printf("状态：leak=%u armed=%u mode=%u\n",
-                static_cast<unsigned>(tele->leak),
-                static_cast<unsigned>(tele->armed),
-                static_cast<unsigned>(tele->mode));
-    return 0;
 }
