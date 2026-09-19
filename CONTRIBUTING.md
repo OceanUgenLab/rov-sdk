@@ -28,22 +28,25 @@ python3 tools/golden_gen.py       # 重新生成 golden 字节向量
 
 ## 提交规范
 
-遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)。提交信息用中文描述，类型前缀用英文：
+遵循 [Conventional Commits](https://www.conventionalcommits.org/)。提交信息一律英文：
 
 ```
-<type>(<scope>): <中文摘要>
+<type>(<scope>): <subject>
 ```
 
 | type | 用途 |
 |------|------|
-| `feat` | 新功能 / 新模块 |
-| `fix` | 缺陷修复 |
-| `docs` | 文档变更 |
-| `test` | 测试与 golden 变更 |
-| `refactor` | 重构（不改行为） |
-| `chore` | 构建/工具/CI 等杂项 |
+| `feat` | New feature / module |
+| `fix` | Bug fix |
+| `docs` | Documentation |
+| `test` | Tests and golden vectors |
+| `refactor` | Refactor (no behavior change) |
+| `build` | Build / toolchain / dependencies |
+| `ci` | CI/CD pipeline |
+| `chore` | Misc (cleanup, retire) |
 
-scope 示例：`schema` / `codegen` / `proto` / `channel` / `link` / `oss`。
+- **scope**：`schema` `codegen` `proto` `channel` `link` `golden` `oss`（跨模块改动省略 scope）
+- **subject**：祈使句、小写开头、动词开头（`add`/`fix`/`remove`/`refactor`/`update`/`bump`）、≤50 字符、不加句号
 
 ## 测试约定
 
