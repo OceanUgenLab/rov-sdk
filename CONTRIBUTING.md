@@ -55,7 +55,7 @@ python3 tools/golden_gen.py       # 重新生成 golden 字节向量
 - feature → develop 用 **squash merge**，≥1 approve（作者不可 self-approve），CI 全绿才 merge。
 - 提 PR 前 `git rebase develop`（冲突用 rebase 解决）；PR 标题用 `<type>(<scope>): <subject>`；PR 正文用统一模板（背景 / 改动 / 验证 / 截图）。
 - main/develop 禁止 force push + 禁止删除 + Require PR。
-- 完整规范见团队知识库：https://ccnl4e0p1x4e.feishu.cn/docx/JbFHdcashoNTL6x34YxcaGyAnEg
+- 完整规范见公司 Git 规范知识库：https://ccnl4e0p1x4e.feishu.cn/docx/JbFHdcashoNTL6x34YxcaGyAnEg
 
 ## 测试约定
 
