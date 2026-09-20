@@ -1,30 +1,30 @@
-## 变更摘要
+## Summary
 
-<!-- 一句话说明本 PR 做了什么。 -->
+<!-- Describe in one sentence what this PR does. -->
 
-## 关联 issue
+## Related issue
 
-<!-- 如 `Closes #12` 或 `Refs #12`。 -->
+<!-- For example `Closes #12` or `Refs #12`. -->
 
-## 变更类型
+## Type of change
 
-- [ ] 新功能（feat）
-- [ ] 缺陷修复（fix）
-- [ ] 文档（docs）
-- [ ] 测试 / golden（test）
-- [ ] 重构（refactor）
-- [ ] 其他
+- [ ] New feature (feat)
+- [ ] Bug fix (fix)
+- [ ] Docs (docs)
+- [ ] Tests / golden (test)
+- [ ] Refactor (refactor)
+- [ ] Other
 
-## 是否涉及协议变更
+## Does this involve a protocol change?
 
-<!-- 若修改了 schema/protocol.yaml 或 generated/，务必勾选并说明。 -->
+<!-- If you modified schema/protocol.yaml or generated/, check this and explain. -->
 
-- [ ] 是 —— 已重新运行 `tools/codegen.py` 与 `tools/golden_gen.py`，并同步三端派生
-- [ ] 否
+- [ ] Yes: re-ran `tools/codegen.py` and `tools/golden_gen.py` and synced the derivation across all three ends
+- [ ] No
 
-## 测试
+## Tests
 
-<!-- 说明如何验证，以及运行结果。 -->
+<!-- Describe how to verify and the results. -->
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -32,8 +32,8 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-- [ ] 全部测试通过
+- [ ] All tests pass
 
-## 其他说明
+## Additional notes
 
-<!-- 任何补充上下文、设计取舍、待办等。 -->
+<!-- Any additional context, design tradeoffs, TODOs, etc. -->

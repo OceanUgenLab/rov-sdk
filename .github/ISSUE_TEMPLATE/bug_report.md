@@ -1,37 +1,37 @@
 ---
-name: Bug 报告
-about: 报告一个缺陷或异常行为
+name: Bug report
+about: Report a defect or unexpected behavior
 title: "[bug] "
 labels: bug
 assignees: ""
 ---
 
-## 描述
+## Description
 
-<!-- 清晰描述问题现象。 -->
+<!-- Clearly describe the problem. -->
 
-## 复现步骤
+## Steps to reproduce
 
-<!-- 最小复现步骤，越具体越好。 -->
+<!-- Minimal reproduction steps; the more specific the better. -->
 
 1.
 2.
 3.
 
-## 期望行为
+## Expected behavior
 
-<!-- 你期望发生什么。 -->
+<!-- What you expected to happen. -->
 
-## 实际行为
+## Actual behavior
 
-<!-- 实际发生了什么（报错信息、崩溃栈、日志片段等）。 -->
+<!-- What actually happened (error messages, crash stacks, log excerpts, etc.). -->
 
-## 环境
+## Environment
 
-- 操作系统 / 架构：
-- 编译器版本（`g++ --version` / `cmake --version`）：
-- 提交版本（`git rev-parse --short HEAD`）：
+- OS / architecture:
+- Compiler version (`g++ --version` / `cmake --version`):
+- Commit (`git rev-parse --short HEAD`):
 
-## 附加信息
+## Additional information
 
-<!-- 相关日志、截图、最小复现代码等。 -->
+<!-- Related logs, screenshots, minimal reproduction code, etc. -->

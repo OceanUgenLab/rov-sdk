@@ -1,23 +1,23 @@
 ---
-name: 功能请求
-about: 建议一个新功能或改进
+name: Feature request
+about: Suggest a new feature or improvement
 title: "[feature] "
 labels: enhancement
 assignees: ""
 ---
 
-## 动机
+## Motivation
 
-<!-- 为什么需要这个功能？解决什么问题？ -->
+<!-- Why is this feature needed? What problem does it solve? -->
 
-## 期望方案
+## Proposed solution
 
-<!-- 描述你期望的行为或接口。 -->
+<!-- Describe the behavior or interface you want. -->
 
-## 备选方案
+## Alternatives
 
-<!-- 是否有其他可接受的实现方式。 -->
+<!-- Are there other acceptable implementations? -->
 
-## 附加信息
+## Additional information
 
-<!-- 相关协议变更需注明是否涉及 schema 改动。 -->
+<!-- For related protocol changes, note whether a schema change is involved. -->

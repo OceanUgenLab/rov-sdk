@@ -1,41 +1,41 @@
-# 贡献指南
+# Contributing
 
-感谢你为 ou_sdk 贡献代码。本仓库是水下机器人三端（上位机 SDK、算力板、STM32 固件）**通信协议的实现与文档持有方**，协议变更必须遵循唯一路径。
+Thanks for contributing to ou_sdk. This repository owns the **implementation and docs of the communication protocol** shared by the three ends of the underwater robot (host-station SDK, compute board, STM32 firmware), so protocol changes must follow the single path below.
 
-## 修改协议的唯一路径
+## The only path for protocol changes
 
-协议以 `schema/protocol.yaml` 为**唯一手写真源**，`generated/` 下所有产物均为派生结果，**禁止手改**。任何协议变更必须依次走完：
+The protocol uses `schema/protocol.yaml` as its **single hand-written source of truth**. Every artifact under `generated/` is a derived result and **must not be edited by hand**. Any protocol change must go through these steps in order:
 
 ```
-改 schema/protocol.yaml
+Edit schema/protocol.yaml
         │
         ▼
-python3 tools/codegen.py          # 重新生成 C++ 头 / C 头 / 协议文档 / ROS2 .msg
+python3 tools/codegen.py          # regenerate C++ header / C header / protocol docs / ROS2 .msg
         │
         ▼
-python3 tools/golden_gen.py       # 重新生成 golden 字节向量
+python3 tools/golden_gen.py       # regenerate golden byte vectors
         │
         ▼
-三端派生同步                      # C++ 头(本仓库) / C 头(rov-firmware) / ROS2 msg(ros2 仓库)
+Sync derivation to all three ends # C++ header (this repo) / C header (rov-firmware) / ROS2 msg (ros2 repo)
         │
         ▼
-回归测试 + 逐字节 golden 比对
+Regression tests + byte-for-byte golden comparison
 ```
 
-- 改协议**只改 schema**，改完跑 codegen + golden_gen，`git diff` 确认 `generated/` 的差异与你预期的字段变更一致。
-- golden 是测试锚点：`tests/test_protocol.cpp` 引用 `generated/golden/golden.h` 逐字节比对，三端实现必须编码/解码出完全一致的字节。
-- 破坏性变更（改帧头、改载荷布局）必须提升 `schema/protocol.yaml` 的 `version`，并在 `CHANGELOG.md` 记录为 `破坏性变更`。
+- To change the protocol, **edit only the schema**. Then run codegen + golden_gen and use `git diff` to confirm that the changes under `generated/` match the field changes you intended.
+- golden is the test anchor: `tests/test_protocol.cpp` includes `generated/golden/golden.h` and compares byte for byte, so all three implementations must encode/decode identical bytes.
+- A breaking change (modifying the frame header or payload layout) must bump the `version` in `schema/protocol.yaml` and be recorded as `breaking change` in `CHANGELOG.md`.
 
-## 提交规范
+## Commit convention
 
-遵循 [Conventional Commits](https://www.conventionalcommits.org/)。提交信息一律英文：
+Follow [Conventional Commits](https://www.conventionalcommits.org/). Commit messages are always in English:
 
 ```
 <type>(<scope>): <subject>
 ```
 
-| type | 用途 |
-|------|------|
+| type | Purpose |
+|------|---------|
 | `feat` | New feature / module |
 | `fix` | Bug fix |
 | `docs` | Documentation |
@@ -45,22 +45,22 @@ python3 tools/golden_gen.py       # 重新生成 golden 字节向量
 | `ci` | CI/CD pipeline |
 | `chore` | Misc (cleanup, retire) |
 
-- **scope**：`schema` `codegen` `proto` `channel` `link` `golden` `oss`（跨模块改动省略 scope）
-- **subject**：祈使句、小写开头、动词开头（`add`/`fix`/`remove`/`refactor`/`update`/`bump`）、≤50 字符、不加句号
+- **scope**: `schema` `codegen` `proto` `channel` `link` `golden` `oss` (omit scope for cross-module changes)
+- **subject**: imperative mood, lowercase first letter, starts with a verb (`add`/`fix`/`remove`/`refactor`/`update`/`bump`), ≤50 characters, no trailing period
 
-## 分支与 PR
+## Branches and PRs
 
-分支采用 Git Flow：`main`（稳定发版，打 tag）+ `develop`（集成）+ `feature/<type>/<kebab-case>`（从 develop 切出，合并后删除）+ `release/vX.Y.Z` + `hotfix/<topic>`。
+Branches follow Git Flow: `main` (stable releases, tagged) + `develop` (integration) + `feature/<type>/<kebab-case>` (branched from develop, deleted after merge) + `release/vX.Y.Z` + `hotfix/<topic>`.
 
-- feature → develop 用 **squash merge**，≥1 approve（作者不可 self-approve），CI 全绿才 merge。
-- 提 PR 前 `git rebase develop`（冲突用 rebase 解决）；PR 标题用 `<type>(<scope>): <subject>`；PR 正文用统一模板（背景 / 改动 / 验证 / 截图）。
-- main/develop 禁止 force push + 禁止删除 + Require PR。
-- 完整规范见公司 Git 规范知识库：https://ccnl4e0p1x4e.feishu.cn/docx/JbFHdcashoNTL6x34YxcaGyAnEg
+- Merge feature → develop with a **squash merge**, require ≥1 approval (the author cannot self-approve), and merge only when CI is fully green.
+- Run `git rebase develop` before opening a PR (resolve conflicts via rebase). Use `<type>(<scope>): <subject>` for the PR title and the shared template for the PR body (background / changes / verification / screenshots).
+- main/develop: no force push, no deletion, and Require PR enabled.
+- Full specification: the company Git standards knowledge base at https://ccnl4e0p1x4e.feishu.cn/docx/JbFHdcashoNTL6x34YxcaGyAnEg
 
-## 测试约定
+## Testing conventions
 
-- 测试位于 `tests/test_*.cpp`，每个文件是**独立可执行程序**（自带 `main()` 与断言宏），由 `tests/CMakeLists.txt` 逐个接入 `ctest`。
-- 提交前必须保证全部测试通过：
+- Tests live in `tests/test_*.cpp`. Each file is a **standalone executable** (with its own `main()` and assertion macros) and is registered with `ctest` one by one by `tests/CMakeLists.txt`.
+- All tests must pass before you commit:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -68,10 +68,10 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-- 新增帧类型 / 改字段，务必同步更新 golden 向量与对应测试，保证「先失败后通过」的红绿循环。
+- When adding a frame type or changing a field, always update the golden vectors and the corresponding tests to preserve the red-green cycle (fail first, then pass).
 
-## 代码风格
+## Code style
 
-- C++20，标准库 + POSIX 原生 API，无外部依赖。
-- 所有注释、文档用英文；标识符、命名空间用英文（`ou::`）。
-- 遵循「最小改动」原则：只改与本次任务直接相关的文件，不顺手重构无关代码。
+- C++20, standard library + native POSIX APIs, no external dependencies.
+- All comments and docs in English; identifiers and namespaces in English (`ou::`).
+- Follow the minimal-change principle: touch only files directly related to the current task and do not refactor unrelated code along the way.
