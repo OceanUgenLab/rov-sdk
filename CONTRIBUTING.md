@@ -48,6 +48,15 @@ python3 tools/golden_gen.py       # 重新生成 golden 字节向量
 - **scope**：`schema` `codegen` `proto` `channel` `link` `golden` `oss`（跨模块改动省略 scope）
 - **subject**：祈使句、小写开头、动词开头（`add`/`fix`/`remove`/`refactor`/`update`/`bump`）、≤50 字符、不加句号
 
+## 分支与 PR
+
+分支采用 Git Flow：`main`（稳定发版，打 tag）+ `develop`（集成）+ `feature/<type>/<kebab-case>`（从 develop 切出，合并后删除）+ `release/vX.Y.Z` + `hotfix/<topic>`。
+
+- feature → develop 用 **squash merge**，≥1 approve（作者不可 self-approve），CI 全绿才 merge。
+- 提 PR 前 `git rebase develop`（冲突用 rebase 解决）；PR 标题用 `<type>(<scope>): <subject>`；PR 正文用统一模板（背景 / 改动 / 验证 / 截图）。
+- main/develop 禁止 force push + 禁止删除 + Require PR。
+- 完整规范见团队知识库：https://ccnl4e0p1x4e.feishu.cn/docx/JbFHdcashoNTL6x34YxcaGyAnEg
+
 ## 测试约定
 
 - 测试位于 `tests/test_*.cpp`，每个文件是**独立可执行程序**（自带 `main()` 与断言宏），由 `tests/CMakeLists.txt` 逐个接入 `ctest`。
