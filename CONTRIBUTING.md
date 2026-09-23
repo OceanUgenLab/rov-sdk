@@ -50,7 +50,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/). Commit mess
 
 ## Branches and PRs
 
-Branches follow Git Flow: `main` (stable releases, tagged) + `develop` (integration) + `feature/<type>/<kebab-case>` (branched from develop, deleted after merge) + `release/vX.Y.Z` + `hotfix/<topic>`.
+Branches follow Git Flow: `main` (stable releases, tagged) + `develop` (integration) + `<type>/<kebab-case>` (feature branches, branched from develop, deleted after merge) + `release/vX.Y.Z` + `hotfix/<topic>`.
 
 - Merge feature → develop with a **squash merge**, require ≥1 approval (the author cannot self-approve), and merge only when CI is fully green.
 - Run `git rebase develop` before opening a PR (resolve conflicts via rebase). Use `<type>(<scope>): <subject>` for the PR title and the shared template for the PR body (background / changes / verification / screenshots).
