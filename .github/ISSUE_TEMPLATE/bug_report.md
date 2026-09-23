@@ -1,22 +1,20 @@
 ---
-name: Bug report
+name: Bug
 about: Report a defect or unexpected behavior
 title: ""
 labels: bug
 assignees: ""
 ---
 
-## Description
+## Background
 
-<!-- Clearly describe the problem. -->
+<!-- What is broken, since when, and the impact. -->
 
 ## Steps to reproduce
 
-<!-- Minimal reproduction steps; the more specific the better. -->
+<!-- Minimal reproduction; the more specific the better. -->
 
 1.
-2.
-3.
 
 ## Expected behavior
 
@@ -24,14 +22,30 @@ assignees: ""
 
 ## Actual behavior
 
-<!-- What actually happened (error messages, crash stacks, log excerpts, etc.). -->
+<!-- What actually happened: error messages, stack traces, log excerpts. -->
 
 ## Environment
 
 - OS / architecture:
-- Compiler version (`g++ --version` / `cmake --version`):
+- Compiler / toolchain version:
 - Commit (`git rev-parse --short HEAD`):
 
-## Additional information
+## Deliverables
 
-<!-- Related logs, screenshots, minimal reproduction code, etc. -->
+<!-- The fix: concrete file / artifact, one per line. -->
+
+-
+
+## Acceptance criteria
+
+<!-- Executable command + expected result that proves the fix. No placeholders. -->
+
+-
+
+## Commit convention
+
+<!-- `<type>(<scope>): <subject>` (English) -->
+
+## Dependencies
+
+<!-- `blocked by #N`, or "none". -->

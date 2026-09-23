@@ -1,23 +1,39 @@
 ---
-name: Feature request
+name: Feature
 about: Suggest a new feature or improvement
 title: ""
 labels: enhancement
 assignees: ""
 ---
 
-## Motivation
+## Background
 
-<!-- Why is this feature needed? What problem does it solve? -->
+<!-- Why this feature is needed; what problem it solves. -->
+
+## Deliverables
+
+<!-- Concrete file / artifact, one per line. -->
+
+-
+
+## Acceptance criteria
+
+<!-- Executable command + expected result. No placeholders. -->
+
+-
 
 ## Proposed solution
 
-<!-- Describe the behavior or interface you want. -->
+<!-- The behaviour or interface you want. -->
 
 ## Alternatives
 
-<!-- Are there other acceptable implementations? -->
+<!-- Other acceptable implementations. -->
 
-## Additional information
+## Commit convention
 
-<!-- For related protocol changes, note whether a schema change is involved. -->
+<!-- `<type>(<scope>): <subject>` (English) -->
+
+## Dependencies
+
+<!-- `blocked by #N`, or "none". -->
