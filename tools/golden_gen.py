@@ -8,7 +8,7 @@ Reads schema/protocol.yaml and emits:
 All generated files carry the header:
     AUTO-GENERATED, DO NOT EDIT, source: schema/protocol.yaml
 
-Frame layout (v0.2.0): AA 55 | ver(1B) | len(1B) | type(1B) | payload | crc16(2B LE)
+Frame layout (v0.3.0): AA 55 | ver(1B) | len(1B) | type(1B) | payload | crc16(2B LE)
 CRC-16/MODBUS covers bytes from ver to end of payload (3 + len bytes total).
 """
 
@@ -30,48 +30,161 @@ AUTO_HEADER = "AUTO-GENERATED, DO NOT EDIT, source: schema/protocol.yaml"
 SCHEMA_PATH = _ROOT / "schema" / "protocol.yaml"
 OUT_DIR = _ROOT / "generated" / "golden"
 
-# Fixed test inputs: every float is chosen to be exactly representable in IEEE-754 float32.
-CMD_INPUTS = {
-    "mode": 1,  # AUTO
-    "armed": 1,
-    "reserved": [0, 0],
-    "surge": 0.5,
-    "sway": -0.25,
-    "heave": 1.0,
-    "yaw": 0.125,
-    "target_depth": 10.0,
-    "target_heading": 90.0,
-    "target_north": 0.0,
-    "target_east": 0.0,
-    "reserved_tail": [0] * 16,
+STRUCT_FMT = {
+    "u8": "B", "u16": "H", "u32": "I", "u64": "Q",
+    "i8": "b", "i16": "h", "i32": "i", "f32": "f", "char": "s",
 }
 
-TELE_INPUTS = {
-    "roll": 0.0,
-    "pitch": -0.25,
-    "heading": 90.0,
-    "yaw_rate": 0.125,
-    "depth": 12.5,
-    "altitude": 5.0,
-    "north": -0.25,
-    "east": 0.25,
-    "vn": 0.5,
-    "ve": -0.5,
-    "vd": 0.125,
-    "voltage": 25.0,
-    "current": 2.5,
-    "percent": 75.0,
-    "temperature": 25.0,
-    "water_temp": 5.0,
-    "salinity": 35.0,
-    "pressure_bar": 10.0,
-    "cable_tension": 250.0,
-    "thr": [0.5, -0.25, 1.0, -1.0, 0.125, -0.5, 0.75, -0.75],
-    "leak": 0,
-    "armed": 1,
-    "mode": 1,  # AUTO
-    "reserved": 0,
-    "reserved_tail": [0] * 16,
+# 固定测试输入：浮点均选 IEEE-754 float32 可精确表示的值；未列出的字段取 0。
+FRAME_INPUTS = {
+    "Heartbeat": {
+        "mode": 1,            # AUTO
+        "system_type": 0x00,  # 机器人 / 机型 0
+        "fw_version": 3,
+        "system_state": 4,    # ARMED
+    },
+    "SysStatus": {
+        "sensors_present": 0x0000010F,
+        "sensors_enabled": 0x0000010F,
+        "sensors_health": 0x0000010F,
+        "load": 125,
+        "voltage_total": 29600,
+        "voltage_cell_max": 4200,
+        "voltage_cell_min": 3900,
+        "current_battery": 250,
+        "battery_remaining": 75,
+        "current_consumed": 5000,
+        "battery_temperature": 2500,
+        "battery_fault_bitmask": 0,
+        "drop_rate_comm": 0,
+        "errors_comm": 0,
+        "errors_count": [1, 2, 3, 4],
+        "stream_mask": 5,  # GPS + SERVO 开
+    },
+    "CommandAck": {
+        "command": 2,  # CMD_ARM
+        "result": 0,   # 接受
+        "progress": 100,
+        "result_param2": 0,
+    },
+    "PoseNed": {
+        "time_boot_ms": 123456,
+        "roll": 0.5,
+        "pitch": -0.25,
+        "yaw": 3.0,
+        "rollspeed": 0.125,
+        "pitchspeed": -0.125,
+        "yawspeed": 0.5,
+        "x": 10.0,
+        "y": -10.0,
+        "z": 12.5,
+        "vx": 0.5,
+        "vy": -0.5,
+        "vz": 0.25,
+    },
+    "EkfStatusReport": {
+        "flags": 0x0003,
+        "velocity_variance": 10,
+        "pos_horiz_variance": 20,
+        "pos_vert_variance": 30,
+        "compass_variance": 40,
+        "terrain_alt_variance": 50,
+    },
+    "VfrHud": {
+        "airspeed": 0.0,
+        "groundspeed": 1.5,
+        "heading": 90,
+        "throttle": 50,
+        "alt": 5.5,
+        "climb": 0.25,
+    },
+    "GlobalPositionInt": {
+        "time_boot_ms": 123456,
+        "lat": 311234567,
+        "lon": 121456789,
+        "alt": 1000,
+        "relative_alt": -5000,
+        "vx": 50,
+        "vy": -50,
+        "vz": 25,
+        "hdg": 9000,
+    },
+    "GpsRawInt": {
+        "time_usec": 1234567890,
+        "fix_type": 3,
+        "lat": 311234567,
+        "lon": 121456789,
+        "alt": 1000,
+        "eph": 100,
+        "epv": 200,
+        "vel": 30,
+        "cog": 9000,
+        "satellites_visible": 12,
+        "h_acc": 250,
+        "v_acc": 400,
+        "vel_acc": 300,
+        "hdg_acc": 500,
+    },
+    "WaterDepth": {
+        "time_boot_ms": 123456,
+        "id": 0,
+        "healthy": 1,
+        "lat": 311234567,
+        "lng": 121456789,
+        "altitude": 5.0,
+        "bottom_distance": 25.0,
+        "terrain_height": -20.5,
+        "temperature": 15.5,
+    },
+    "DistanceSensor": {
+        "time_boot_ms": 123456,
+        "min_distance": 20,
+        "max_distance": 5000,
+        "current_distance": 250,
+        "type": 1,
+        "id": 0,
+        "orientation": 0,
+        "covariance": 255,
+        "horizontal_fov": 0.5,
+        "vertical_fov": 0.25,
+        "signal_quality": 100,
+    },
+    "ManualControl": {
+        "sequence": 7,
+        "x": 600,
+        "y": -300,
+        "z": 125,
+        "p": 0,
+        "r": 0,
+        "yaw": -100,
+    },
+    "Command": {
+        "command": 1,       # CMD_SET_MODE
+        "param": 3,         # HOLD
+    },
+    "RcChannels": {
+        "time_boot_ms": 123456,
+        "chancount": 6,
+        "chan_raw": [1500, 1500, 1500, 1500, 1100, 1900] + [65535] * 12,
+        "rssi": 100,
+    },
+    "ServoOutputRaw": {
+        "time_boot_ms": 123456,
+        "port": 0,
+        "servo_raw": [1500, 1600, 1400, 1500, 1100, 1900, 1500, 1500] + [1500] * 8,
+    },
+    "ParamSet": {
+        "param_id": b"P_GAIN\0" + b"\0" * 9,
+        "param_value": 0.5,
+        "param_type": 2,
+    },
+    "ParamValue": {
+        "param_id": b"P_GAIN\0" + b"\0" * 9,
+        "param_value": 0.5,
+        "param_type": 2,
+        "param_count": 128,
+        "param_index": 42,
+    },
 }
 
 
@@ -88,84 +201,73 @@ def crc16(data: bytes) -> int:
     return crc & 0xFFFF
 
 
-def build_payload(fields_layout: list[dict], values: dict) -> bytes:
-    """Encode payload bytes from schema field order and fixed values."""
+def field_value(name: str, ftype: str, count: int) -> list:
+    """取固定输入值，缺省补 0；char 数组按字节串补齐。"""
+    default = FRAME_INPUTS.get(_frame_now, {}).get(name, 0)
+    if ftype == "char":
+        raw = bytes(default) if isinstance(default, (bytes, bytearray)) else str(default).encode()
+        raw = raw[:count]
+        return list(raw + b"\0" * (count - len(raw)))
+    if count > 1:
+        vals = list(default) if isinstance(default, (list, tuple)) else [default] * count
+        if len(vals) != count:
+            raise ValueError(f"{_frame_now}.{name} expects {count} values, got {len(vals)}")
+        return vals
+    return [default]
+
+
+def build_payload(fields_layout: list[dict]) -> bytes:
     out = bytearray()
     for f in fields_layout:
-        name = f["name"]
-        count = f["count"]
-        if f["type"] == "u8":
-            raw = values[name]
-            if count > 1:
-                if len(raw) != count:
-                    raise ValueError(f"u8 array {name} expects {count} values, got {len(raw)}")
-                out.extend(struct.pack(f"<{count}B", *raw))
-            else:
-                out.append(int(raw) & 0xFF)
-        elif f["type"] == "f32":
-            raw = values[name]
-            if count > 1:
-                if len(raw) != count:
-                    raise ValueError(f"f32 array {name} expects {count} values, got {len(raw)}")
-                out.extend(struct.pack(f"<{count}f", *raw))
-            else:
-                out.extend(struct.pack("<f", float(raw)))
+        vals = field_value(f["name"], f["type"], f["count"])
+        fmt = STRUCT_FMT[f["type"]]
+        if fmt == "s":
+            out.extend(struct.pack(f"<{f['count']}s", bytes(vals)))
+        elif f["count"] > 1:
+            out.extend(struct.pack(f"<{f['count']}{fmt}", *vals))
         else:
-            raise ValueError(f"unknown type {f['type']}")
+            out.extend(struct.pack(f"<{fmt}", vals[0]))
     return bytes(out)
 
 
-def build_frame(payload: bytes, frame_type: int, version: int = 0x02) -> bytes:
-    """Assemble v0.2.0 frame and append CRC over ver..payload."""
-    stx0 = 0xAA
-    stx1 = 0x55
+def build_frame(payload: bytes, frame_type: int, version: int) -> bytes:
+    """Assemble frame and append CRC over ver..payload."""
     length = len(payload)
-    header = bytes([stx0, stx1, version, length, frame_type])
-    crc_body = bytes([version, length, frame_type]) + payload
-    crc = crc16(crc_body)
+    header = bytes([0xAA, 0x55, version, length, frame_type])
+    crc = crc16(bytes([version, length, frame_type]) + payload)
     return header + payload + bytes([crc & 0xFF, (crc >> 8) & 0xFF])
 
 
-def case_from_inputs(
-    schema: dict,
-    frame_name: str,
-    inputs: dict,
-    array_name: str,
-    notes: str,
-) -> dict:
-    fields = compute_layout(schema["frames"][frame_name]["fields"])
-    payload = build_payload(fields, inputs)
-    frame_type = schema["frames"][frame_name]["type"]
-    frame = build_frame(payload, frame_type)
-    return {
-        "name": frame_name,
-        "array_name": array_name,
-        "frame_type": frame_type,
-        "payload_size": len(payload),
-        "total_length": len(frame),
-        "notes": notes,
-        "inputs": inputs,
-        "expected_frame": list(frame),
-    }
+_frame_now = ""
 
 
 def make_cases(schema: dict) -> list[dict]:
-    cases = [
-        case_from_inputs(
-            schema,
-            "CmdPacket",
-            CMD_INPUTS,
-            "OU_GOLDEN_CMD_FRAME",
-            "固定控制指令 golden 帧，mode=AUTO, armed=1, 全部 reserved 清零",
-        ),
-        case_from_inputs(
-            schema,
-            "TelemetryPacket",
-            TELE_INPUTS,
-            "OU_GOLDEN_TELE_FRAME",
-            "固定遥测 golden 帧，mode=AUTO, armed=1, 8 路 thr 互异，全部 reserved 清零",
-        ),
-    ]
+    global _frame_now
+    version = int(str(schema["version"]), 0)
+    cases = []
+    for frame_name, frame in schema["frames"].items():
+        _frame_now = frame_name
+        layout = compute_layout(frame["fields"])
+        payload = build_payload(layout)
+        frame_type = int(str(frame["type"]), 0)
+        golden_frame = build_frame(payload, frame_type, version)
+        inputs = {}
+        for f in layout:
+            vals = field_value(f["name"], f["type"], f["count"])
+            if f["type"] == "char":
+                inputs[f["name"]] = bytes(vals).split(b"\0")[0].decode("ascii", "replace")
+            else:
+                inputs[f["name"]] = vals if f["count"] > 1 else vals[0]
+        cases.append({
+            "name": frame_name,
+            "array_name": f"OU_GOLDEN_{frame_name.upper()}_FRAME",
+            "frame_type": frame_type,
+            "payload_size": len(payload),
+            "total_length": len(golden_frame),
+            "notes": frame.get("notes", ""),
+            "inputs": inputs,
+            "expected_frame": list(golden_frame),
+        })
     return cases
 
 
@@ -181,9 +283,9 @@ def render_h(cases: list[dict]) -> str:
     lines.append("")
     lines.append("#include <stdint.h>")
     lines.append("")
-    lines.append(f"#define OU_GOLDEN_CRC_KNOWN_ANSWER 0x4B37")
+    lines.append("#define OU_GOLDEN_CRC_KNOWN_ANSWER 0x4B37")
     lines.append("")
-    lines.append("/* CRC standard test vector: crc16(\"123456789\") = 0x4B37 */")
+    lines.append('/* CRC standard test vector: crc16("123456789") = 0x4B37 */')
     crc_data = list("123456789".encode("ascii"))
     crc_data_str = ", ".join(fmt_hex_byte(b) for b in crc_data)
     lines.append(f"static const uint8_t OU_GOLDEN_CRC_DATA_123456789[] = {{{crc_data_str}}};")
@@ -192,7 +294,7 @@ def render_h(cases: list[dict]) -> str:
         name = case["name"]
         arr = case["array_name"]
         length = case["total_length"]
-        lines.append(f"/* {name}: {case['notes']} */")
+        lines.append(f"/* {name} (type=0x{case['frame_type']:02X}): {case['notes']} */")
         lines.append(f"#define {arr}_LEN {length}")
         bytes_str = ", ".join(fmt_hex_byte(b) for b in case["expected_frame"])
         lines.append(f"static const uint8_t {arr}[{arr}_LEN] = {{{bytes_str}}};")
@@ -202,7 +304,6 @@ def render_h(cases: list[dict]) -> str:
 
 
 def render_json(cases: list[dict]) -> str:
-    # Keep readable with indentation; ensure deterministic ordering.
     payload = {
         "auto_header": AUTO_HEADER,
         "crc_known_answer": {"input": "123456789", "expected": "0x4B37"},
@@ -220,18 +321,8 @@ def write_if_changed(path: Path, content: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate golden vectors from schema.")
-    parser.add_argument(
-        "--schema",
-        type=Path,
-        default=SCHEMA_PATH,
-        help="path to protocol.yaml",
-    )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=OUT_DIR,
-        help="output directory",
-    )
+    parser.add_argument("--schema", type=Path, default=SCHEMA_PATH)
+    parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
     args = parser.parse_args()
 
     schema = load_schema(args.schema)

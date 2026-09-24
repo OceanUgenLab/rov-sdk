@@ -7,6 +7,9 @@
 协议以 `schema/protocol.yaml` 为**唯一手写真源**，`generated/` 下所有产物均为派生结果，**禁止手改**。任何协议变更必须依次走完：
 
 ```
+docs/ou_protocol/ 需求整理          # MAVLink 需求笔记 + P0 帧清单（评审输入）
+        │
+        ▼
 改 schema/protocol.yaml
         │
         ▼
@@ -22,6 +25,7 @@ python3 tools/golden_gen.py       # 重新生成 golden 字节向量
 回归测试 + 逐字节 golden 比对
 ```
 
+- 新增帧（如 OU 协议 P0 帧）先在 [`docs/ou_protocol/p0-frames.md`](docs/ou_protocol/p0-frames.md) 中整理并评审帧格式，再按上述路径写入 schema。
 - 改协议**只改 schema**，改完跑 codegen + golden_gen，`git diff` 确认 `generated/` 的差异与你预期的字段变更一致。
 - golden 是测试锚点：`tests/test_protocol.cpp` 引用 `generated/golden/golden.h` 逐字节比对，三端实现必须编码/解码出完全一致的字节。
 - 破坏性变更（改帧头、改载荷布局）必须提升 `schema/protocol.yaml` 的 `version`，并在 `CHANGELOG.md` 记录为 `破坏性变更`。

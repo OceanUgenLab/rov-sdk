@@ -1,10 +1,9 @@
-// 上位机发指令最小示例：构造 CmdPacket → ou::encodeCmd → ou::UdpFrameLink::send_frame
+// 上位机发指令最小示例：ManualControl 杆量 + Command 命令 → encode → UdpFrameLink::send_frame
 //
 // 运行：
 //   ./host_command_sender [对端IP] [对端端口]
-//   默认发往 127.0.0.1:9090（可配合 board_telemetry_receiver 对向测试，但两者帧方向不同，
-//   此处仅演示编码 + 发送语义，不要求对端真实应答）。
-#include <ou/protocol.hpp>   // CmdPacket、encodeCmd（codegen 生成）
+//   默认发往 127.0.0.1:9090。发送 10 Hz 手动杆量 2 秒，随后发一条 CMD_SET_MODE(HOLD) 命令。
+#include <ou/protocol.hpp>   // ManualControl、Command、encodeX（codegen 生成）
 #include <ou/frame_link.hpp> // UdpFrameLink
 #include <ou/udp_channel.hpp>// UdpChannel
 
@@ -12,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <thread>
 
 int main(int argc, char* argv[]) {
     // 目标地址：对端（算力板 / 从控）IP 与端口
@@ -25,7 +25,6 @@ int main(int argc, char* argv[]) {
         std::fprintf(stderr, "本地 UDP 绑定失败\n");
         return 1;
     }
-    // 显式指定对端地址（否则 send 会等待首个数据报学习对端，此处直接指定）
     if (!channel.set_peer(peer_ip, peer_port)) {
         std::fprintf(stderr, "设置对端地址失败: %s:%u\n", peer_ip.c_str(),
                      static_cast<unsigned>(peer_port));
@@ -35,30 +34,41 @@ int main(int argc, char* argv[]) {
     // 2. 组合层：UdpFrameLink 持有 channel，负责「数据报即帧」的整包收发
     ou::UdpFrameLink link(channel);
 
-    // 3. 构造控制指令载荷（v0.2.0，payload 52 字节）
-    ou::CmdPacket cmd;
-    cmd.mode = 0;              // 运行模式：0 = MANUAL 手动遥控
-    cmd.armed = 1;             // 解锁：1 = armed 输出推进器
-    cmd.surge = 0.5f;          // 前(+) 半速
-    cmd.sway = 0.0f;
-    cmd.heave = 0.0f;
-    cmd.yaw = 0.2f;            // 右转(+) 20%
-    cmd.target_depth = 10.0f;  // 目标深度（闭环/自动模式使用）
-    cmd.target_heading = 0.0f; // 目标航向
+    // 3. 心跳：上报上位机身份（bit0=1 地面站，SDK 主版本 3）
+    ou::Heartbeat hb;
+    hb.mode = static_cast<uint8_t>(ou::Mode::kManual);
+    hb.system_type = 0x01;
+    hb.fw_version = 3;
+    hb.system_state = static_cast<uint8_t>(ou::SystemState::kStandby);
+    link.send_frame(ou::encodeHeartbeat(hb));
 
-    // 4. 编码为完整帧（AA 55 | ver | len | type | payload | crc16）
-    const auto frame = ou::encodeCmd(cmd);
+    // 4. 手动杆量：10 Hz × 2 秒，六轴速度指令（0 = 该轴交由飞控自稳）
+    for (uint16_t seq = 1; seq <= 20; ++seq) {
+        ou::ManualControl ctrl;
+        ctrl.sequence = seq;
+        ctrl.x = 600;    // 前进 60%
+        ctrl.y = 0;
+        ctrl.z = 0;      // 深度交给自稳
+        ctrl.p = 0;
+        ctrl.r = 0;
+        ctrl.yaw = -100; // 左偏航 10%
+        if (!link.send_frame(ou::encodeManualControl(ctrl))) {
+            std::fprintf(stderr, "发送失败\n");
+            return 1;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 
-    // 5. 发送整帧（不再二次编码，直接走 channel.send）
-    if (!link.send_frame(frame)) {
+    // 5. 命令：切 HOLD 模式（飞控应以 CommandAck 应答，本示例不等待）
+    ou::Command cmd;
+    cmd.command = static_cast<uint16_t>(ou::CommandId::kCmdSetMode);
+    cmd.param = static_cast<uint32_t>(ou::Mode::kHold);
+    if (!link.send_frame(ou::encodeCommand(cmd))) {
         std::fprintf(stderr, "发送失败\n");
         return 1;
     }
 
-    std::printf("已发送控制指令帧 %zu 字节 -> %s:%u\n", frame.size(),
+    std::printf("已发送 20 帧 ManualControl(10Hz) + 1 帧 CMD_SET_MODE(HOLD) -> %s:%u\n",
                 peer_ip.c_str(), static_cast<unsigned>(peer_port));
-    std::printf("  surge=%.2f  yaw=%.2f  target_depth=%.1f m  armed=%u\n",
-                cmd.surge, cmd.yaw, cmd.target_depth,
-                static_cast<unsigned>(cmd.armed));
     return 0;
 }

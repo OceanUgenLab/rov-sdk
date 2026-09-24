@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+### 破坏性变更（协议 v0.3.0，P0 帧体系）
+
+- **协议硬切**：`ver` 固定为 `0x03`，旧 v0.2.0 帧作废。删除 `CmdPacket`(0x01) / `TelemetryPacket`(0x02)，两号不回收；三端（SDK / 算力板 / 固件）一次切换，不设过渡期。
+- **新增 16 帧**（P0）：
+  - 批次 A 命令闭环：`Heartbeat`(0x50)、`Command`(0x32)、`CommandAck`(0x51)、`ManualControl`(0x30)；
+  - 批次 B 遥测：`SysStatus`(0x10，含电池与 stream_mask)、`PoseNed`(0x13)、`EkfStatusReport`(0x14)、`VfrHud`(0x15)、`GlobalPositionInt`(0x16)、`GpsRawInt`(0x18，默认关)、`WaterDepth`(0x19)、`DistanceSensor`(0x52)、`RcChannels`(0x1A，默认关)、`ServoOutputRaw`(0x1B，默认关)；
+  - 批次 C 参数：`ParamSet`(0x33)、`ParamValue`(0x1D)。
+  - 默认关闭的三帧由 `CMD_SET_STREAM` 命令按需开启，开关状态经 `SysStatus.stream_mask` 广播。
+- **架构变化**：帧编解码全部由 codegen 在 `generated/ou/protocol.hpp` 内联生成（支持 u8..u64/i8..i32/f32/char 与定长数组）；`src/protocol.cpp` 仅保留 CRC 与 FrameParser；`packet_traits` 挂载 encode/decode 函数引用，泛型 `ou::encode<Pkt>` / `ou::decode<Pkt>`。
+- ROS2 `.msg` 生成由固定 2 个改为逐帧生成（`generated/msg/<Frame>.msg`）。
+
 ## [0.2.0] - 2026-08-28
 
 ### 破坏性变更
